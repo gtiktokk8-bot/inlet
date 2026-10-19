@@ -320,6 +320,7 @@
   .acctrow .live{color:var(--green)}
   .acctrow .dead{color:var(--red)}
   .acctrow .mini{border:0;background:var(--fill);color:var(--accent);border-radius:999px;height:30px;padding:0 12px;font-size:15px;flex-shrink:0}
+  .acctrow .mini.rm{background:none;padding:0 2px}
   .acctrow .mini.rm{color:var(--red)}`;
   const G_ICON = '<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
   let gate = null;
@@ -359,19 +360,21 @@
   }
   function renderSettings(container) {
     const head = document.createElement("div"); head.className = "ghead"; head.textContent = "Accounts";
-    const grp = document.createElement("div"); grp.className = "group";
+    const grp = document.createElement("div"); grp.className = "group ic";
     for (const a of accounts) {
       const r = document.createElement("div"); r.className = "acctrow";
+      const av = document.createElement("span"); av.className = "chip av"; av.setAttribute("aria-hidden", "true"); av.textContent = (a.name || a.email).trim().charAt(0).toUpperCase();
       const l = document.createElement("span"); l.className = "label"; l.style.flex = "1"; l.style.minWidth = "0";
       const n = document.createElement("span"); n.textContent = a.email; n.style.overflow = "hidden"; n.style.textOverflow = "ellipsis"; n.style.whiteSpace = "nowrap";
       const s = document.createElement("small"); s.className = dead(a) ? "dead" : "live"; s.textContent = dead(a) ? "Signed out" : keeps(a) ? "Connected · stays signed in" : "Connected";
-      l.append(n, s); r.append(l);
+      l.append(n, s); r.append(av, l);
       if (dead(a)) { const rc = document.createElement("button"); rc.type = "button"; rc.className = "mini"; rc.textContent = "Reconnect"; rc.onclick = async () => { try { await signIn(a.email); } catch (e) { if (e.code === "need_consent") alert(e.message); } openSettingsAgain(); }; r.append(rc); }
       const rm = document.createElement("button"); rm.type = "button"; rm.className = "mini rm"; rm.textContent = "Remove"; rm.setAttribute("aria-label", "Remove " + a.email);
       rm.onclick = () => { if (confirm("Remove " + a.email + " from Inlet? Your mail stays in Gmail.")) { removeAccount(a.email); openSettingsAgain(); } };
       r.append(rm); grp.append(r);
     }
-    const add = document.createElement("button"); add.type = "button"; add.textContent = "Add account"; add.style.color = "var(--accent)";
+    const add = document.createElement("button"); add.type = "button"; add.className = "addrow";
+    add.innerHTML = '<span class="chip blue" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span class="label">Add account</span>';
     add.onclick = async () => { try { await signIn(null); } catch (e) { if (e.code !== "cancelled") alert(e.message); } openSettingsAgain(); };
     grp.append(add);
     const foot = document.createElement("div"); foot.className = "gfoot"; foot.textContent = "Replies go out from the account the email came to. New emails let you pick which address to send from." + (SRV.enabled && accounts.some(a => !a.srv) ? " Accounts without “stays signed in” will ask once more; after that they stay connected." : "");
