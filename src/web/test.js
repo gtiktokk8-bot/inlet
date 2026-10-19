@@ -32,6 +32,7 @@ const GIS = `window.google={accounts:{oauth2:{initTokenClient(cfg){return{reques
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); }); p.on('response', r => { if (r.status() === 404) errs.push('404 ' + r.url()); });
   await ctx.route('**/*', async route => {
     const req = route.request(); const u = new URL(req.url());
+    if (u.host === 'inlet.test' && u.pathname === '/api/auth/status') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: false, ai: false, accounts: [] }) });
     if (u.host === 'inlet.test') { const f = path.join(DIST, u.pathname === '/' ? 'index.html' : u.pathname); return fs.existsSync(f) ? route.fulfill({ path: f }) : route.fulfill({ status: 404 }); }
     if (u.host === 'accounts.google.com') return route.fulfill({ contentType: 'text/javascript', body: GIS });
     const json = (o, s = 200) => route.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });

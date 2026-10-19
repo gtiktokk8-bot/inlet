@@ -56,7 +56,10 @@ json.dump({"name": "Inlet", "short_name": "Inlet", "start_url": "/", "display": 
            "icons": [{"src": "/icon-180.png", "sizes": "180x180", "type": "image/png"},
                      {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}]},
           open(os.path.join(dist, "manifest.webmanifest"), "w"))
-open(os.path.join(dist, "vercel.json"), "w").write(json.dumps({"headers": [{"source": "/(.*)", "headers": [
+import shutil
+shutil.rmtree(os.path.join(dist, "api"), ignore_errors=True)
+shutil.copytree(os.path.join(HERE, "api"), os.path.join(dist, "api"))
+open(os.path.join(dist, "vercel.json"), "w").write(json.dumps({"functions": {"api/ai.js": {"maxDuration": 60}}, "headers": [{"source": "/(.*)", "headers": [
     {"key": "X-Content-Type-Options", "value": "nosniff"},
     {"key": "Referrer-Policy", "value": "no-referrer"},
     {"key": "X-Frame-Options", "value": "DENY"},
