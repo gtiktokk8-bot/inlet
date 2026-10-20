@@ -16,7 +16,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <style>html,body{margin:0;height:100%}body{padding-top:env(safe-area-inset-top)}</style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script>window.INLET_CLIENT_ID="563715878928-ll5nno80bdd0rkaa1l2fmuq28idtht2t.apps.googleusercontent.com";window.INLET_BUILD="Oct 20, 07:37";</script>
+<script>window.INLET_CLIENT_ID="563715878928-ll5nno80bdd0rkaa1l2fmuq28idtht2t.apps.googleusercontent.com";window.INLET_BUILD="Oct 20, 08:19";</script>
 <script>/* Inlet standalone: multi-account Google sign-in + Gmail/Calendar REST adapter.
    Exposes the same window.claude.use("mcp") interface the app already uses inside Claude,
    so the app code is identical in both builds. No server: the browser talks to Google directly. */
@@ -188,6 +188,12 @@
     })(p);
     return plain || (html ? htmlToText(html) : "");
   }
+  function bodyHtml(p) {
+    let html = "";
+    (function walk(x) { if (!x || html) return; const mt = (x.mimeType || "").toLowerCase();
+      if (mt === "text/html" && x.body && x.body.data && !x.filename) { html = b64d(x.body.data); return; } (x.parts || []).forEach(walk); })(p);
+    return html.length > 600000 ? "" : html;
+  }
   function mapMsg(acc, m, withBody) {
     const p = m.payload || {};
     const o = {
@@ -197,7 +203,7 @@
       labelIds: m.labelIds || [], toRecipients: splitAddrs(hdr(p, "to")), ccRecipients: splitAddrs(hdr(p, "cc")),
       sizeEstimate: m.sizeEstimate || 0, account: acc.email,
     };
-    if (withBody) o.plaintextBody = bodyText(p);
+    if (withBody) { o.plaintextBody = bodyText(p); const h = bodyHtml(p); if (h) o.htmlBody = h; }
     return o;
   }
   const viewUrl = (acc, id) => "https://mail.google.com/mail/?authuser=" + encodeURIComponent(acc.email) + "#all/" + id;
@@ -283,6 +289,13 @@
     for (const k of [...cache.keys()]) if (k.startsWith(email + "|" + id + "|")) cache.delete(k);
     return {};
   }
+  async function label(input) {
+    const [email, id] = split(input.threadId); const acc = find(email);
+    if (!acc) throw err("tool_error", "That account was removed");
+    await g(acc, "threads/" + id + "/modify", { method: "POST", body: JSON.stringify({ addLabelIds: input.labelIds || [] }) });
+    for (const k of [...cache.keys()]) if (k.startsWith(email + "|" + id + "|")) cache.delete(k);
+    return {};
+  }
   async function createEvent(input) {
     const acc = (input.account && find(input.account)) || accounts.find(live) || accounts[0];
     if (!acc) throw err("not_granted");
@@ -302,6 +315,7 @@
       else if (server === "Gmail" && tool === "reply") payload = await reply(input);
       else if (server === "Gmail" && tool === "send_message") payload = await sendMessage(input);
       else if (server === "Gmail" && tool === "unlabel_thread") payload = await unlabel(input);
+      else if (server === "Gmail" && tool === "label_thread") payload = await label(input);
       else if (server === "Google Calendar" && tool === "create_event") payload = await createEvent(input);
       else throw err("not_in_manifest", tool);
       return { payload };
@@ -920,7 +934,7 @@ svg{flex-shrink:0}
 @media (prefers-reduced-motion: reduce){.push.enter,.push.leave,.sheet.enter,.sheet.leave,.mrow.sending,.toast:not([hidden]){animation:none!important}.mrow .b,.mrow .ts,.swipe>.row,.fcard{transition:none}}
 
 /* ---------- clean theme: one accent, neutral avatars, 5 radii (8/10/12/18/22), Apple type scale ---------- */
-.av{background:var(--avatar)!important;font-weight:500;border-radius:50%}
+.av{background:var(--avatar);font-weight:600;border-radius:50%}
 .seg{border-radius:10px}.seg button{border-radius:8px}
 .segsmall{border-radius:10px}.segsmall button{border-radius:8px}
 .tile2,.stats,.state,.smartcard,.calcard,.scam,.aicard,.draftcard,.menulist,.remindbox{border-radius:12px}
@@ -1103,6 +1117,41 @@ html,body{overscroll-behavior:none;overflow:hidden}
 .fcard h2 .hl{all:unset;cursor:pointer;padding:3px 0;margin:-3px 0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
 @media (max-height:640px){.fcard h2 .hl{-webkit-line-clamp:2}}
 .fcard h2 .hl:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+
+/* ===== Cycle 12: Feed actions, real emails, Gmail-style list ===== */
+.fcard{touch-action:none}
+.stamp.read{left:18px;color:#0A84FF;transform:rotate(-12deg)}
+.stamp.flag{right:18px;color:#FF9500;transform:rotate(12deg)}
+.stamp.arch{left:50%;top:auto;bottom:18px;color:#AF52DE;transform:translateX(-50%)}
+.acts3{justify-content:space-around!important;padding-left:24px!important;padding-right:24px!important}
+.acts3 .round{width:64px!important;height:64px!important}
+.acts3 .rd{color:#0A84FF!important}.acts3 .ar{color:#AF52DE!important}.acts3 .fl{color:#FF9500!important}
+.acts3 .round::after{color:var(--ink)!important;font-weight:600}
+.readbar button{min-width:0!important;padding:0 16px!important}
+#rRead,#rArch,#rFlag{color:var(--ink)}#rRead svg{color:#0A84FF}#rArch svg{color:#AF52DE}#rFlag svg{color:#FF9500}
+.readbar{max-width:calc(100% - 24px)}.readbar button{flex:1 1 auto;gap:6px!important}
+@media (max-width:360px){.readbar button{padding:0 11px!important;font-size:15px}}
+.reader.noacts{padding-bottom:calc(30px + env(safe-area-inset-bottom,0px))}
+.mailwrap{margin:0 -8px}
+.mailcardfull{background:#fff;border-radius:12px;overflow:hidden;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08)}
+.mailframe{display:block;width:100%;border:0;min-height:120px;background:#fff}
+.imgbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 8px 10px;padding:10px 12px;border-radius:12px;background:var(--fill);font-size:13px;color:var(--muted)}
+.imgbar span{flex:1 1 180px}
+.imgbar button{border:0;background:var(--bg);color:var(--accent);border-radius:999px;height:32px;padding:0 14px;font-size:15px;font-weight:600}
+.mdlink{font-weight:600}
+.mailcard{all:unset;box-sizing:border-box;display:flex;flex-direction:column;width:min(86%,340px);background:var(--bubble);border-radius:18px;overflow:hidden;cursor:pointer;-webkit-user-select:none;user-select:none}
+.mailcard:active{opacity:.85}
+.mchead{display:flex;flex-direction:column;gap:2px;padding:10px 14px 8px}
+.mchead b{font-size:15px;line-height:20px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mchead span{font-size:13px;color:var(--muted2)}
+.mcprev{position:relative;max-height:300px;overflow:hidden;background:#fff;pointer-events:none;margin:0 6px;border-radius:12px}
+.mcprev::after{content:"";position:absolute;left:0;right:0;bottom:0;height:70px;background:linear-gradient(rgba(255,255,255,0),#fff)}
+.mcopen{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;font-size:15px;font-weight:600;color:var(--ink)}.mcopen svg{color:var(--muted)}
+.row.hassub .pv{-webkit-line-clamp:1!important}
+.row .sj{font-size:15px;line-height:20px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px}
+.row.unread .sj{font-weight:600}
+.row .sj .star{color:#F5B400;flex-shrink:0}
+.row .av{box-shadow:inset 0 0 0 .5px rgba(0,0,0,.06)}
 </style>
 
 <div class="app" id="app">
@@ -1203,7 +1252,7 @@ html,body{overscroll-behavior:none;overflow:hidden}
   <section class="push" id="reader" hidden aria-label="Email">
     <div class="navrow"><button class="textbtn" id="readerBack" aria-label="Back to Feed"><svg width="11" height="18" viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg></button><span></span><a class="iconbtn" id="readerGmail" aria-label="Open in Gmail" target="_blank" rel="noopener"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a></div>
     <div class="reader" id="readerBody"></div>
-    <div class="readbar"><button type="button" id="rClear"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>Clear</button><button type="button" id="rKeep"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg>Keep</button></div>
+    <div class="readbar" id="readBar"><button type="button" id="rFlag" aria-label="Flag"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>Flag</button><button type="button" id="rArch" aria-label="Archive"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M3 4h18v4H3Z"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>Archive</button><button type="button" id="rRead" aria-label="Mark as read"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 4l9 6v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/><path d="m3 10 9 6 9-6"/></svg>Read</button><button type="button" id="rClear" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>Clear</button><button type="button" id="rKeep" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg>Keep</button></div>
   </section>
 
   <!-- PERSON INFO -->
@@ -1245,7 +1294,7 @@ const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=nu
 const svgNS="http://www.w3.org/2000/svg";
 function icon(d,size=20,fill=false,sw=2){const s=document.createElementNS(svgNS,"svg");s.setAttribute("width",size);s.setAttribute("height",size);s.setAttribute("viewBox","0 0 24 24");s.setAttribute("aria-hidden","true");
   const p=document.createElementNS(svgNS,"path");p.setAttribute("d",d);if(fill){p.setAttribute("fill","currentColor");}else{p.setAttribute("fill","none");p.setAttribute("stroke","currentColor");p.setAttribute("stroke-width",sw);p.setAttribute("stroke-linecap","round");p.setAttribute("stroke-linejoin","round");}s.append(p);return s;}
-const I={shield:"M12 3 19 6v5.5c0 4.3-2.9 8-7 9.5-4.1-1.5-7-5.2-7-9.5V6Z",send:"M21 3 3 10.5l7 2.5 2.5 7Z M21 3 10 13",reset:"M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v4.5H8",party:"M4 20 9 7l8 8Z M14 4c.5 1.5 0 3-1 4 M19 9c-1.5-.3-3 .2-4 1.2 M18 3.5v.01 M21 6v.01",unpin:"M8 4h8l-1 6 3 3H6l3-3Z M12 16v5",heart:"M12 20s-7-4.3-8.8-8.6C1.8 8 4 5 7.3 5c1.9 0 3.4 1 4.7 2.6C13.3 6 14.8 5 16.7 5 20 5 22.2 8 20.8 11.4 19 15.7 12 20 12 20Z",
+const I={mailopen:"M3 10 12 4l9 6v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z M3 10l9 6 9-6",archive:"M3 4h18v4H3Z M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8 M10 12h4",flag:"M5 21V4 M5 4h11l-2 4 2 4H5",star:"m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z",shield:"M12 3 19 6v5.5c0 4.3-2.9 8-7 9.5-4.1-1.5-7-5.2-7-9.5V6Z",send:"M21 3 3 10.5l7 2.5 2.5 7Z M21 3 10 13",reset:"M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v4.5H8",party:"M4 20 9 7l8 8Z M14 4c.5 1.5 0 3-1 4 M19 9c-1.5-.3-3 .2-4 1.2 M18 3.5v.01 M21 6v.01",unpin:"M8 4h8l-1 6 3 3H6l3-3Z M12 16v5",heart:"M12 20s-7-4.3-8.8-8.6C1.8 8 4 5 7.3 5c1.9 0 3.4 1 4.7 2.6C13.3 6 14.8 5 16.7 5 20 5 22.2 8 20.8 11.4 19 15.7 12 20 12 20Z",
   like:"M7 11v9H4v-9h3Zm0 0 4-7a2 2 0 0 1 3 2l-1 4h6a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.8 20H7",check:"m5 12.5 4.5 4.5L19 7.5",q:"M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5M12 18h.01",bang:"M12 4v10M12 19h.01",
   reply:"M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-2",remind:"M12 8v4l3 2M3.5 12a8.5 8.5 0 1 0 2.5-6L3 9M3 4v5h5",snooze:"M12 7.5V12l3 2M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17Z",
   pin:"M15 4.5 19.5 9 15 11l-3 6-5-5 6-3 2-4.5ZM8.5 15.5 4 20",copy:"M8 8h11v12H8zM5 16V4h11",fwd:"m15 14 5-5-5-5M20 9H9a5 5 0 0 0 0 10h2",
@@ -1284,7 +1333,8 @@ function parseAddr(s){s=(s||"").trim();const m=s.match(/^\s*"?(.*?)"?\s*<([^>]+)
 function prettyName(a){if(a.name)return a.name;const l=(a.email.split("@")[0]||a.email).replace(/[._-]+/g," ").trim();return l.replace(/\b\w/g,c=>c.toUpperCase())||a.email;}
 const initials=n=>{const p=n.split(/\s+/).filter(Boolean);return((p[0]||"?")[0]+(p.length>1?p[p.length-1][0]:"")).toUpperCase();};
 const HUES=["#3A6EA5","#B5487A","#2F7D5B","#B5651D","#5B5BB0","#2F6F7D","#8E4EC6","#7D4F2F"];
-const color=()=>"var(--avatar)";
+const AVC=["#D56E0C","#1A73E8","#188038","#D93025","#8430CE","#C5297B","#0B8A94","#5F6368","#B3261E","#3F51B5"];
+const color=e=>{let h=0;for(const c of String(e||""))h=(h*31+c.charCodeAt(0))>>>0;return `linear-gradient(180deg,rgba(255,255,255,.16),rgba(0,0,0,.08)),${AVC[h%AVC.length]}`;};
 function avatar(addr,cls="av"){const n=prettyName(addr);const a=el("span",cls,initials(n));a.style.background=color(addr.email);return a;}
 function when(iso){const d=new Date(iso),n=new Date();if(isNaN(d))return"";const days=Math.floor((new Date(n.toDateString())-new Date(d.toDateString()))/864e5);
   if(days===0)return d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});if(days===1)return"Yesterday";if(days<7&&days>0)return d.toLocaleDateString("en-US",{weekday:"short"});return d.toLocaleDateString("en-US",{month:"short",day:"numeric"});}
@@ -1307,10 +1357,12 @@ function stripSignoff(t){let L=t.replace(/\s*Sent from my (iPhone|iPad|Android|G
   while(L.length&&!L[L.length-1].trim())L.pop();
   const n=L.length;if(n>=3&&/^[A-Z][\w.'-]*( [A-Z][\w.'-]*){0,2}$/.test(L[n-1].trim())&&/^(thanks|thank you|best|cheers|regards|best regards|kind regards|sincerely|talk soon|-+)[,!.]?$/i.test(L[n-2].trim()))L=L.slice(0,n-2);
   while(L.length&&!L[L.length-1].trim())L.pop();return L.join("\n");}
-function fillText(node,text){node.textContent="";const re=/https?:\/\/[^\s<>"')]+/g;let last=0,m;
-  while((m=re.exec(text))){node.append(document.createTextNode(text.slice(last,m.index)));let url=m[0].replace(/[.,;:!?]+$/,"");
-    const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener noreferrer";let host="";try{const u=new URL(url);host=u.hostname.replace(/^www\./,"")+(u.pathname.length>1?"/…":"");}catch{host=url;}
-    a.textContent=host;a.title=url;node.append(a);last=m.index+url.length;}
+function fillText(node,text){node.textContent="";const re=/\[([^\]\n]{1,160})\]\s?\((https?:\/\/[^\s)]+)\)|<(https?:\/\/[^\s<>]+)>|(https?:\/\/[^\s<>"')\]]+)/g;let last=0,m;
+  while((m=re.exec(text))){node.append(document.createTextNode(text.slice(last,m.index)));
+    let url=(m[2]||m[3]||m[4]).replace(/[.,;:!?]+$/,"");const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener noreferrer";a.title=url;
+    if(m[1]){a.textContent=m[1].trim();a.className="mdlink";last=m.index+m[0].length;}
+    else{let host="";try{const u=new URL(url);host=u.hostname.replace(/^www\./,"")+(u.pathname.length>1?"/…":"");}catch{host=url;}a.textContent=host;last=m[4]?m.index+url.length:m.index+m[0].length;}
+    node.append(a);}
   node.append(document.createTextNode(text.slice(last)));}
 function hiddenWhat(raw){const parts=[];if(/^\s*>/m.test(raw)||/^On .+wrote:/m.test(raw)||/original message/i.test(raw)){const n=(raw.match(/^On .+wrote:/gm)||[]).length;parts.push(n>1?`${n} quoted replies`:"quoted reply");}
   if(/\n--\s*\n|Sent from my|Get Outlook/i.test(raw))parts.push("signature");if(/confidential|unsubscribe|intended recipient/i.test(raw))parts.push("legal footer");return parts;}
@@ -1371,7 +1423,8 @@ function model(){
     const unread=msgs.some(m=>(m.labelIds||[]).includes("UNREAD"));
     if(isFeed(addr.email,msg)){feed.push({t,last,addr,unread});continue;}
     const p=people.get(addr.email)||{addr,threads:[],date:"",snippet:"",fromMe:false,unread:false,url:""};
-    p.threads.push(t);if(!p.date||new Date(last.date)>new Date(p.date)){p.date=last.date;p.snippet=decode(last.snippet);p.fromMe=isSent(last);p.url=t.viewUrl;if(_acct)p.account=_acct;}
+    p.threads.push(t);if(!p.date||new Date(last.date)>new Date(p.date)){p.date=last.date;p.snippet=decode(last.snippet);p.subject=decode(last.subject||"").replace(/^((re|fwd?|fw):\s*)+/ig,"");p.fromMe=isSent(last);p.url=t.viewUrl;if(_acct)p.account=_acct;}
+    if(msgs.some(m=>(m.labelIds||[]).includes("STARRED")))p.starred=true;
     if(addr.name&&!p.addr.name)p.addr=addr;p.unread=p.unread||unread;people.set(addr.email,p);}
   let plist=[...people.values()].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const snoozedList=plist.filter(p=>snoozed[p.addr.email]&&new Date(snoozed[p.addr.email])>now);plist=plist.filter(p=>!snoozedList.includes(p));
@@ -1416,7 +1469,7 @@ function render(){
 }
 function personRow(p,o={}){const name=prettyName(p.addr);const r=el("button","row");r.type="button";const waitingMe=!p.fromMe&&p.unread;
   const dc=el("span","dotcol");if(waitingMe)dc.append(el("span","dot"));
-  const rb=el("span","rb");const rt=el("span","rt");const tmw=el("span","tm",o.time||when(p.date));tmw.append(icon(I.chev,13,false,2.2));rt.append(el("span","nm",name),tmw);if(waitingMe)r.classList.add("unread");rb.append(rt,el("span","pv",o.preview||((p.fromMe?"You: ":"")+String(p.snippet||"").replace(/\s*Sent from my (iPhone|iPad|Android)\S*/gi,""))));
+  const rb=el("span","rb");const rt=el("span","rt");const tmw=el("span","tm",o.time||when(p.date));tmw.append(icon(I.chev,13,false,2.2));rt.append(el("span","nm",name),tmw);if(waitingMe)r.classList.add("unread");rb.append(rt);if(p.subject&&!o.preview){const sj=el("span","sj");if(p.starred){const st=icon(I.star,13,true,0);st.classList.add("star");sj.append(st);}sj.append(document.createTextNode(p.subject));rb.append(sj);r.classList.add("hassub");}rb.append(el("span","pv",o.preview||((p.fromMe?"You: ":"")+String(p.snippet||"").replace(/\s*Sent from my (iPhone|iPad|Android)\S*/gi,""))));
   r.append(dc,avatar(p.addr),rb);r.setAttribute("aria-label",name+(waitingMe?", unread":""));r.addEventListener("click",()=>openPerson(p,o.prefill));return r;}
 let openSwipe=null;
 function swipeRow(row,p){const w=el("div","swipe");const L=el("div","acts l"),Rr=el("div","acts r");const email=p.addr.email,name=prettyName(p.addr);
@@ -1467,7 +1520,7 @@ function renderFeed(fresh,T){
   if(!fresh.length){body.append(stateBox("Feed cleared","Newsletters, receipts and alerts land here, never in People. Nothing left today.",I.check,"good"));return;}
   const f=fresh[0];const stack=el("div","stack");stack.append(el("div","ghost1"),el("div","ghost2"));
   const card=el("article","fcard");
-  const src=el("div","src");const nm=prettyName(f.addr);src.append(el("div","tile",nm[0].toUpperCase()));
+  const src=el("div","src");const nm=prettyName(f.addr);const ftile=el("div","tile",nm[0].toUpperCase());ftile.style.background=color(f.addr.email);src.append(ftile);
   const sn=el("div","srcname");const kind=(f.last.labelIds||[]).includes("CATEGORY_PROMOTIONS")?"Promotion":(f.last.labelIds||[]).includes("CATEGORY_SOCIAL")?"Social":(f.last.labelIds||[]).includes("CATEGORY_UPDATES")?"Update":"Newsletter";
   sn.append(el("b",null,nm),el("span",null,`${kind} · ${when(f.last.date)}`));src.append(sn,el("span","mins",`${Math.max(1,Math.round((f.last.sizeEstimate||4000)/9000))} min`));
   const h2=el("h2");const hb=el("button","hl",decode(f.last.subject||"(no subject)"));hb.type="button";h2.append(hb);card.append(src,h2);
@@ -1478,20 +1531,27 @@ function renderFeed(fresh,T){
   if(/PROMOTIONS|SOCIAL|FORUMS/.test((f.last.labelIds||[]).join(" "))||/newsletter|news@|digest|weekly/i.test(f.addr.email+" "+(f.last.subject||""))){const un=el("a",null,"Unsubscribe in Gmail");un.href=safeUrl(f.t.viewUrl);un.target="_blank";un.rel="noopener";tags.append(un);}
   const mv=el("button",null,"Move to People");mv.type="button";mv.addEventListener("click",()=>{overrides[f.addr.email]="people";save();render();toast(`${nm} will show in People.`,"Undo",()=>{delete overrides[f.addr.email];save();render();});});tags.append(mv);
   if(S.sample&&prefs.aiOn){const ai=el("button",null,"Summarize");ai.type="button";ai.addEventListener("click",()=>feedSummary(f,sum,ai));tags.append(ai);}
-  const stK=el("div","stamp keep","KEEP"),stC=el("div","stamp clear","CLEAR");card.append(tags,stK,stC);stack.append(card);body.append(stack);
-  const rb=el("div","roundbtns");
-  const bx=el("button","round big");bx.type="button";bx.setAttribute("aria-label",(prefs.clearMode||"read")==="archive"?"Clear: archive in Gmail":"Clear: mark as read");bx.dataset.l="Clear";bx.style.color="var(--red)";bx.append(icon(I.x,26,false,2.4));
-  const bl=el("button","round mid");bl.type="button";bl.setAttribute("aria-label","Read later");bl.dataset.l="Later";bl.style.color="var(--muted)";bl.append(icon(I.clock,22,false,2.2));bl.addEventListener("click",()=>{later[f.t.id]=Date.now();save();render();});
-  const bk=el("button","round big");bk.type="button";bk.setAttribute("aria-label","Keep unread in inbox");bk.dataset.l="Keep";bk.style.color="var(--green)";bk.append(icon(I.check,28,false,2.4));
-  rb.append(bx,bl,bk);body.append(rb,el("div","swipehint","Tap to read · swipe left to clear · right to keep"));
-  let x0=null,dx=0;
-  let moved=false,y0=0;card.addEventListener("pointerdown",e=>{if(e.target.closest("a,button"))return;x0=e.clientX;y0=e.clientY;dx=0;moved=false;card.setPointerCapture(e.pointerId);card.classList.add("dragging");});
-  card.addEventListener("pointermove",e=>{if(x0==null)return;dx=e.clientX-x0;if(Math.abs(dx)>6||Math.abs(e.clientY-y0)>8)moved=true;card.style.transform=`translateX(${dx}px) rotate(${dx/24}deg)`;stK.style.opacity=Math.max(0,Math.min(1,dx/90));stC.style.opacity=Math.max(0,Math.min(1,-dx/90));});
-  let flown=false;const fly=(dir,fn)=>{if(flown)return;flown=true;haptic();card.classList.remove("dragging");card.style.transform=`translateX(${dir*130}%) rotate(${dir*18}deg)`;setTimeout(fn,reduceMotion.matches?0:260);};
-  const end=()=>{if(x0==null)return;x0=null;if(dx<-90)fly(-1,()=>clearItem(f));else if(Math.abs(dx)<6&&!moved){card.classList.remove("dragging");card.style.transform="";openReader(f,{clear:()=>bx.onclick(),keep:()=>bk.onclick()});}else if(dx>90)fly(1,()=>{kept[f.t.id]=true;save();render();});else{card.classList.remove("dragging");card.style.transform="";stK.style.opacity=0;stC.style.opacity=0;}};
-  bx.onclick=()=>fly(-1,()=>clearItem(f));bk.onclick=()=>fly(1,()=>{kept[f.t.id]=true;save();render();toast("Kept in your inbox","Undo",()=>{delete kept[f.t.id];save();render();});});
+  const stR=el("div","stamp read","READ"),stF=el("div","stamp flag","FLAG"),stA=el("div","stamp arch","ARCHIVE");card.append(tags,stR,stF,stA);stack.append(card);body.append(stack);
+  const rb=el("div","roundbtns acts3");
+  const mkb=(cls,label,aria,ic)=>{const b=el("button","round big "+cls);b.type="button";b.setAttribute("aria-label",aria);b.dataset.l=label;b.append(icon(ic,25,false,2.1));return b;};
+  const bRead=mkb("rd","Read","Mark as read (swipe right)",I.mailopen),bArch=mkb("ar","Archive","Archive (swipe down)",I.archive),bFlag=mkb("fl","Flag","Flag it (swipe left)",I.flag);
+  rb.append(bFlag,bArch,bRead);body.append(rb,el("div","swipehint","Tap to read · ← flag · ↓ archive · → read"));
+  let x0=null,y0=0,dx=0,dy=0,moved=false;
+  const stamps=(r,fl,ar)=>{stR.style.opacity=r;stF.style.opacity=fl;stA.style.opacity=ar;};
+  card.addEventListener("pointerdown",e=>{if(e.target.closest("a,button:not(.hl)"))return;x0=e.clientX;y0=e.clientY;dx=0;dy=0;moved=false;card.setPointerCapture(e.pointerId);card.classList.add("dragging");});
+  card.addEventListener("pointermove",e=>{if(x0==null)return;dx=e.clientX-x0;dy=e.clientY-y0;if(Math.abs(dx)>6||Math.abs(dy)>8)moved=true;
+    const down=dy>0&&dy>Math.abs(dx);
+    card.style.transform=down?`translateY(${dy}px) scale(${Math.max(.9,1-dy/1500)})`:`translateX(${dx}px) rotate(${dx/24}deg)`;
+    const k=v=>Math.max(0,Math.min(1,v/90));stamps(down?0:k(dx),down?0:k(-dx),down?k(dy):0);});
+  let flown=false;const fly=(dir,fn)=>{if(flown)return;flown=true;haptic();card.classList.remove("dragging");
+    card.style.transform=dir==="down"?"translateY(130%) scale(.86)":`translateX(${dir*130}%) rotate(${dir*18}deg)`;card.style.opacity=dir==="down"?"0":"";setTimeout(fn,reduceMotion.matches?0:260);};
+  const doRead=()=>fly(1,()=>markReadItem(f)),doArch=()=>fly("down",()=>archive(f)),doFlag=()=>fly(-1,()=>flagItem(f));
+  const end=()=>{if(x0==null)return;x0=null;const down=dy>0&&dy>Math.abs(dx);
+    if(down&&dy>110)doArch();else if(!down&&dx<-90)doFlag();else if(!down&&dx>90)doRead();
+    else{card.classList.remove("dragging");card.style.transform="";stamps(0,0,0);if(!moved)openReader(f,{read:doRead,archive:doArch,flag:doFlag});}};
+  bRead.onclick=doRead;bArch.onclick=doArch;bFlag.onclick=doFlag;
   card.addEventListener("pointerup",end);card.addEventListener("pointercancel",end);
-  hb.onclick=()=>openReader(f,{clear:()=>bx.onclick(),keep:()=>bk.onclick()});
+  hb.onclick=e=>{if(e.detail===0)openReader(f,{read:doRead,archive:doArch,flag:doFlag});};
 }
 function renderRing(M,waiting,done,pPct,fPct,fTotal,T,st){
   const d=new Date();$("ringDate").textContent=d.toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"});
@@ -1522,34 +1582,62 @@ function setTab(t){const was=S.tab;S.tab=t;$("scrPeople").hidden=t!=="people";$(
 $("tabPeople").onclick=()=>setTab("people");$("tabFeed").onclick=()=>setTab("feed");$("tabRing").onclick=()=>setTab("ring");
 $("segFeed").onclick=()=>setTab("feed");$("segPeople").onclick=()=>setTab("people");$("ringRow").onclick=()=>setTab("ring");
 
-async function clearItem(f){if((prefs.clearMode||"read")==="archive")return archive(f);
-  const id=f.t.id;bump("cleared");cleared[id]=new Date(f.last.date).getTime();const cut=Date.now()-45*864e5;for(const k in cleared)if(cleared[k]<cut)delete cleared[k];save();
+async function markReadItem(f){const id=f.t.id;bump("cleared");cleared[id]=new Date(f.last.date).getTime();const cut=Date.now()-45*864e5;for(const k in cleared)if(cleared[k]<cut)delete cleared[k];save();
   const wasUnread=(f.t.messages||[]).some(m=>(m.labelIds||[]).includes("UNREAD"));(f.t.messages||[]).forEach(m=>{m.labelIds=(m.labelIds||[]).filter(l=>l!=="UNREAD");});render();
   if(wasUnread){try{await S.mcp.callTool(GMAIL,"unlabel_thread",{threadId:id,labelIds:["UNREAD"]});}catch(e){toast(`Couldn't mark as read: ${errCopy(e)[0]}.`);}}}
-async function archive(f){const id=f.t.id;S.threads=S.threads.filter(t=>t.id!==id);S.older=S.older.filter(t=>t.id!==id);bump("cleared");render();
+async function flagItem(f){const id=f.t.id;bump("cleared");kept[id]=true;save();(f.t.messages||[]).forEach(m=>{if(!(m.labelIds||[]).includes("STARRED"))m.labelIds=(m.labelIds||[]).concat("STARRED");});render();
+  try{await S.mcp.callTool(GMAIL,"label_thread",{threadId:id,labelIds:["STARRED"]});
+    toast("Flagged · starred in Gmail","Undo",async()=>{delete kept[id];save();(f.t.messages||[]).forEach(m=>{m.labelIds=(m.labelIds||[]).filter(l=>l!=="STARRED");});render();try{await S.mcp.callTool(GMAIL,"unlabel_thread",{threadId:id,labelIds:["STARRED"]});}catch{}});}
+  catch(e){toast(`Couldn't flag: ${errCopy(e)[0]}.`);}}
+async function archive(f){const id=f.t.id;S.threads=S.threads.filter(t=>t.id!==id);S.older=S.older.filter(t=>t.id!==id);bump("cleared");render();toast("Archived");
   try{await S.mcp.callTool(GMAIL,"unlabel_thread",{threadId:id,labelIds:["INBOX"]});}
   catch(e){toast(`Couldn't archive: ${errCopy(e)[0]}.`);try{await S.mcp.invalidate(GMAIL);}catch{}watchInbox();}}
 
 
+
+/* ---------- real email rendering (sandboxed: no scripts, images only when you ask) ---------- */
+function sanitizeMail(html,imgs){try{const d=new DOMParser().parseFromString(String(html||""),"text/html");
+    d.querySelectorAll("script,iframe,frame,object,embed,form,meta,link,base,noscript,audio,video,svg foreignObject").forEach(n=>n.remove());
+    d.querySelectorAll("*").forEach(n=>{for(const a of [...n.attributes]){const k=a.name.toLowerCase(),v=a.value||"";if(k.startsWith("on")||/^\s*(javascript|vbscript|data:text\/html)/i.test(v)&&/^(href|src|action|xlink:href|formaction|background)$/.test(k))n.removeAttribute(a.name);}});
+    d.querySelectorAll("img").forEach(i=>{const w=parseInt(i.getAttribute("width"))||0,h=parseInt(i.getAttribute("height"))||0,st=(i.getAttribute("style")||"").replace(/\s/g,"");
+      if((w&&w<=3)||(h&&h<=3)||/(width|height):[0-3]px/i.test(st)||/display:none/i.test(st)){i.remove();return;}
+      if(/^cid:/i.test(i.getAttribute("src")||"")){i.remove();return;}
+      if(!imgs){i.removeAttribute("src");i.removeAttribute("srcset");}});
+    if(!imgs)d.querySelectorAll("[background]").forEach(n=>n.removeAttribute("background"));
+    const styles=[...d.querySelectorAll("style")].map(x=>x.outerHTML).join("");return styles+(d.body?d.body.innerHTML:"");}catch{return "";}}
+function emailFrame(html,opt={}){const f=document.createElement("iframe");f.className="mailframe";f.title="Email";
+  f.setAttribute("sandbox","allow-same-origin allow-popups allow-popups-to-escape-sandbox");f.setAttribute("referrerpolicy","no-referrer");f.setAttribute("loading","lazy");
+  const imgs=!!opt.images;
+  const csp=`default-src 'none'; style-src 'unsafe-inline' https:; font-src https: data:; img-src data: cid:${imgs?" https: http:":""}; media-src 'none'; frame-src 'none'; form-action 'none'`;
+  const clean=sanitizeMail(html,imgs);
+  f.srcdoc=`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><base target="_blank"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0!important;padding:0;background:#fff;color:#1d1d1f;-webkit-text-size-adjust:100%;overflow-wrap:anywhere}body{font:16px/1.45 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;padding:${opt.pad||0}px}img{max-width:100%!important;height:auto!important}${imgs?"":"img{display:none!important}"}table{max-width:100%!important}a{color:#0068D6}</style></head><body>${clean}</body></html>`;
+  const fit=()=>{try{const d=f.contentDocument;if(!d||!d.body)return;const b=d.body,w=f.clientWidth||300;b.style.zoom="";const sw=Math.max(b.scrollWidth,d.documentElement.scrollWidth);if(sw>w+2)b.style.zoom=String(Math.max(.4,w/sw));f.style.height=Math.ceil(d.documentElement.scrollHeight)+"px";}catch{}};
+  f.addEventListener("load",()=>{try{const d=f.contentDocument;d.querySelectorAll("a[href]").forEach(a=>{const h=a.getAttribute("href")||"";if(!/^(https?:|mailto:)/i.test(h))a.removeAttribute("href");else{a.target="_blank";a.rel="noopener noreferrer";}});d.querySelectorAll("img").forEach(i=>{const w=+i.getAttribute("width")||0,h=+i.getAttribute("height")||0;if((w&&w<=2)||(h&&h<=2))i.remove();else i.addEventListener("load",fit);});}catch{}fit();setTimeout(fit,250);setTimeout(fit,1200);});
+  return f;}
+function imageBar(onShow){const bar=el("div","imgbar");bar.append(el("span",null,"Images are off so senders can't track when you open this."));
+  const once=el("button",null,"Show images");once.type="button";once.onclick=()=>onShow(false);const always=el("button",null,"Always");always.type="button";always.onclick=()=>{prefs.images=true;save();onShow(true);};bar.append(once,always);return bar;}
+function emailBody(host,m){host.replaceChildren();
+  if(m.htmlBody){const wrap=el("div","mailwrap");const draw=imgs=>{wrap.replaceChildren();if(!imgs)wrap.append(imageBar(()=>draw(true)));const card=el("div","mailcardfull");card.append(emailFrame(m.htmlBody,{images:imgs,pad:12}));wrap.append(card);};draw(!!prefs.images);host.append(wrap);return;}
+  const txt=readerText(m.plaintextBody||decode(m.snippet||""));for(const para of txt.split(/\n\n+/)){const pEl=el("p");fillText(pEl,para);host.append(pEl);}}
 /* ---------- Feed reader: tap a card to read the whole email ---------- */
 function readerText(t){return String(t||"").replace(/[​‌‍͏­﻿]+/g,"").replace(/[ \t ]+\n/g,"\n").replace(/\n[ \t]+/g,"\n").replace(/\n{3,}/g,"\n\n").trim();}
 let readerActs=null;
-async function openReader(f,acts){readerActs=acts||null;const b=$("readerBody");b.replaceChildren();b.scrollTop=0;
-  const nm=prettyName(f.addr);const src=el("div","rsrc");src.append(el("div","tile",nm[0].toUpperCase()));const sn=el("div");sn.append(el("b",null,nm),el("span",null,`${f.addr.email} · ${when(f.last.date)}`));src.append(sn);
-  b.append(src,el("h1",null,decode(f.last.subject||"(no subject)")));
-  const sc=scamCheck(f.last);if(sc){const w=el("div","scam");w.append(el("span",null,`Says it's from ${sc.brand}, but came from ${sc.dom}. Don't click links.`));b.append(w);}
+function openReader(f,acts){return showEmail({addr:f.addr,msg:f.last,url:f.t.viewUrl,threadId:f.t.id,acts,thread:f.t,unread:f.unread});}
+async function showEmail(o){readerActs=o.acts||null;$("readBar").hidden=!o.acts;const b=$("readerBody");b.replaceChildren();b.scrollTop=0;b.classList.toggle("noacts",!o.acts);
+  const m0=o.msg||{};const nm=prettyName(o.addr);const src=el("div","rsrc");const tile=el("div","tile",nm[0].toUpperCase());tile.style.background=color(o.addr.email);src.append(tile);
+  const sn=el("div");sn.append(el("b",null,nm),el("span",null,`${o.addr.email} · ${when(m0.date)}`));src.append(sn);
+  b.append(src,el("h1",null,decode(m0.subject||"(no subject)")));
+  const sc=scamCheck(m0);if(sc){const w=el("div","scam");w.append(el("span",null,`Says it's from ${sc.brand}, but came from ${sc.dom}. Don't click links.`));b.append(w);}
   const body=el("div","rbody");body.append(el("p","rload","Loading…"));b.append(body);
-  $("readerGmail").href=safeUrl(f.t.viewUrl);push("reader");
-  try{const r=await S.mcp.callTool(GMAIL,"get_thread",{threadId:f.t.id,messageFormat:"PLAIN_TEXT"},{cache:{staleTime:300000}});
-    const m=((r.payload&&r.payload.messages)||[]).slice().sort((a,c)=>new Date(a.date)-new Date(c.date)).at(-1)||{};
-    let txt=readerText(m.plaintextBody||decode(f.last.snippet));const cut=txt.length>40000;if(cut)txt=txt.slice(0,40000);
-    body.replaceChildren();for(const para of txt.split(/\n\n+/)){const pEl=el("p");fillText(pEl,para);body.append(pEl);}
-    if(cut){const more=el("a",null,"Read the rest in Gmail");more.href=safeUrl(f.t.viewUrl);more.target="_blank";more.rel="noopener";body.append(more);}
-    if((m.labelIds||[]).includes("UNREAD")||f.unread){S.mcp.callTool(GMAIL,"unlabel_thread",{threadId:f.t.id,labelIds:["UNREAD"]}).then(()=>{(f.t.messages||[]).forEach(x=>{x.labelIds=(x.labelIds||[]).filter(l=>l!=="UNREAD");});}).catch(()=>{});}}
+  $("readerGmail").href=safeUrl(o.url);push("reader");
+  try{let m=o.full;
+    if(!m){const r=await S.mcp.callTool(GMAIL,"get_thread",{threadId:o.threadId,messageFormat:"PLAIN_TEXT"},{cache:{staleTime:300000}});
+      const ms=((r.payload&&r.payload.messages)||[]).slice().sort((a,c)=>new Date(a.date)-new Date(c.date));m=ms.find(x=>x.id===m0.id)||ms.at(-1)||{};}
+    emailBody(body,m);
+    if(o.thread&&((m.labelIds||[]).includes("UNREAD")||o.unread)){S.mcp.callTool(GMAIL,"unlabel_thread",{threadId:o.threadId,labelIds:["UNREAD"]}).then(()=>{(o.thread.messages||[]).forEach(x=>{x.labelIds=(x.labelIds||[]).filter(l=>l!=="UNREAD");});}).catch(()=>{});}}
   catch(e){body.replaceChildren(el("p","rload",`Couldn't load this email: ${errCopy(e)[0]}.`));}}
 $("readerBack").onclick=()=>pop("reader");edgeSwipe("reader");
-$("rClear").onclick=()=>{const a=readerActs;pop("reader",()=>a&&a.clear());};
-$("rKeep").onclick=()=>{const a=readerActs;pop("reader",()=>a&&a.keep());};
+for(const[id,k]of[["rRead","read"],["rArch","archive"],["rFlag","flag"]])$(id).onclick=()=>{const a=readerActs;pop("reader",()=>a&&a[k]&&a[k]());};
 /* ---------- conversation ---------- */
 async function openPerson(p,prefill){
   S.person=p;S.convMsgs=[];closeMenu();$("aiCard").hidden=true;$("draftCard").hidden=true;
@@ -1580,12 +1668,20 @@ function drawMessages(){
     const prev=S.convMsgs[i-1],next=S.convMsgs[i+1];const key=x=>isSent(x)?"me":parseAddr(x.sender).email;
     const joinPrev=prev&&key(prev)===key(m)&&(t-new Date(prev.date))<15*60e3&&box.lastChild&&box.lastChild.classList&&box.lastChild.classList.contains("mrow");
     const joinNext=next&&key(next)===key(m)&&(new Date(next.date)-t)<15*60e3;
+    const rich=!out&&!!m.htmlBody&&(isFeed(parseAddr(m.sender).email,m)||(m.htmlBody.match(/<img\b/gi)||[]).length>2||(m.htmlBody.match(/<table\b/gi)||[]).length>3||/\]\s?\(https?:/.test(raw));
+    if(rich){const row=el("div","mrow in gstart");const card=el("button","mailcard");card.type="button";card.setAttribute("aria-label","Open email: "+(subj||"no subject"));
+      const hd=el("div","mchead");hd.append(el("b",null,subj||"(no subject)"),el("span",null,prettyName(parseAddr(m.sender))));
+      const pv=el("div","mcprev");pv.append(emailFrame(m.htmlBody,{images:!!prefs.images,pad:10}));const op=el("div","mcopen");op.append(document.createTextNode("Open email"),icon(I.chev,13,false,2.4));
+      card.append(hd,pv,op);card.onclick=()=>showEmail({addr:parseAddr(m.sender),msg:m,full:m,url:(S.person&&S.person.url)||"",threadId:m.threadId});attachLongPress(card,m,short,false);
+      row.append(card,el("span","ts",new Date(m.date).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})));box.append(row);
+    }else{
     const row=el("div","mrow "+(out?"out":"in")+(joinPrev?"":" gstart"));
     const b=el("div","b "+(out?"out":"in")+(joinNext?"":" tail"));fillText(b,short);b.tabIndex=0;b.setAttribute("aria-label",(out?"You: ":"")+short.slice(0,120));attachLongPress(b,m,short,out);
     row.append(b,el("span","ts",new Date(m.date).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})));box.append(row);
     if(short.split("\n").length>14||short.length>900){b.classList.add("capped");const rm=el("button","readmore","Read more");rm.type="button";rm.style.alignSelf=out?"flex-end":"flex-start";rm.onclick=()=>{b.classList.remove("capped");rm.remove();};box.append(rm);}
     if(short.length<raw.length-20){const what=hiddenWhat(raw);const label=(what.length?what.join(", ").replace(/^./,c=>c.toUpperCase())+" hidden":"Older text hidden")+" · Show";
       const hn=el("button","hidden-note"+(out?" r":""),label);hn.type="button";let full=false;hn.addEventListener("click",()=>{full=!full;fillText(b,full?raw:short);if(full)b.classList.remove("capped");hn.textContent=full?"Hide again":label;});box.append(hn);}
+    }
     if(!out){const code=findCode(raw),dt=findDate(short);
       if(code){const c=el("div","smartcard");c.append(el("span","code",code.replace(/(\d{3})(\d{3})/,"$1 $2")));const cb=el("button","smallbtn","Copy code");cb.type="button";
         cb.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(code);toast("Code copied.");}catch{toast(`Code: ${code}`,null,null,8000);}});c.append(cb);const sm=el("div","smart");sm.append(c);box.append(sm);}
@@ -1639,6 +1735,7 @@ function openMenu(anchor,m,text,out){
   if(out)item(I.remind,"Remind me if no reply","Auto-cancels when they answer",()=>{remindOpen=!remindOpen;rb.hidden=!remindOpen;},true);
   item(I.snooze,"Snooze "+(prettyName(p.addr).split(" ")[0]),"",()=>{closeMenu();snoozeSheet();});
   item(I.pin,pins[p.addr.email]?"Unpin "+prettyName(p.addr).split(" ")[0]:"Pin "+prettyName(p.addr).split(" ")[0],"",()=>{closeMenu();if(pins[p.addr.email])delete pins[p.addr.email];else pins[p.addr.email]=true;save();render();toast(pins[p.addr.email]?"Pinned to the top.":"Unpinned.");});
+  if(m.htmlBody||(m.plaintextBody||"").length>300)item(I.doc,"View full email","",()=>{closeMenu();showEmail({addr:parseAddr(m.sender),msg:m,full:m,url:(p&&p.url)||"",threadId:m.threadId});});
   item(I.copy,"Copy","",async()=>{closeMenu();try{await navigator.clipboard.writeText(text);toast("Copied.");}catch{toast("Couldn't copy here. Select the text instead.");}});
   item(I.fwd,"Forward","",()=>{closeMenu();composeSheet("",`Fwd: ${decode(m.subject||"")}`,`\n\n---------- Forwarded message ----------\nFrom: ${m.sender}\nDate: ${new Date(m.date).toLocaleString()}\nSubject: ${decode(m.subject||"")}\n\n${text}`);});
   w.append(list);
@@ -1694,7 +1791,7 @@ function calendarSheet(title,dt){openSheet(sh=>{
     try{await S.mcp.callTool(GCAL,"create_event",input);closeSheet();toast("Added to your calendar.");}
     catch(e){add.disabled=false;add.textContent="Add";const[h,b]=errCopy(e);msg.textContent=`${h}. ${b}`;msg.hidden=false;}});
   const two=el("div","two");two.append(fld("Date",iD),fld("Time (optional)",iH));
-  sh.append(fld("Title",iT),two,el("p",null,"Saves to the Google Calendar connected to Claude. No time means all day."),msg);sh.lastChild.previousSibling.style.cssText="margin:0;font-size:13px;color:var(--muted)";});}
+  sh.append(fld("Title",iT),two,el("p",null,"Saves to your Google Calendar. No time means all day."),msg);sh.lastChild.previousSibling.style.cssText="margin:0;font-size:13px;color:var(--muted)";});}
 function snoozeSheet(){const p=S.person;if(!p)return;const name=prettyName(p.addr).split(" ")[0];openSheet(sh=>{
   const bar=el("div","bar");const c=el("button","textbtn","Cancel");c.type="button";c.onclick=closeSheet;bar.append(c,el("b",null,`Snooze ${name}`),el("span"));sh.append(bar);
   const now=new Date(),tonight=new Date(now);tonight.setHours(18,0,0,0);if(tonight<=now)tonight.setDate(tonight.getDate()+1);
@@ -1748,16 +1845,11 @@ function openSettings(){const b=$("setBody");b.replaceChildren();if(window.Inlet
   const seg=el("div","segsmall");seg.style.gridTemplateColumns="repeat(4,minmax(0,1fr))";
   for(const s of[5,10,20,30]){const x=el("button",null,`${s} s`);x.type="button";x.setAttribute("aria-pressed",String(prefs.undo===s));x.onclick=()=>{prefs.undo=s;save();seg.querySelectorAll("button").forEach(y=>y.setAttribute("aria-pressed",String(y===x)));};seg.append(x);}
   r1.append(seg);sg.append(r1);b.append(sg);
-  b.append(el("div","ghead","Feed"));const fg=el("div","group ic");const f1=el("div");f1.style.flexDirection="column";f1.style.alignItems="stretch";f1.style.paddingTop="10px";
-  const f1h=el("div");f1h.style.cssText="display:flex;align-items:center;gap:12px";f1h.append(chip("gray",I.x),el("span",null,"Clearing a card"));f1.append(f1h);
-  const seg2=el("div","segsmall");seg2.style.gridTemplateColumns="repeat(2,minmax(0,1fr))";
-  for(const[k,lab]of[["read","Marks it read"],["archive","Archives it"]]){const x=el("button",null,lab);x.type="button";x.setAttribute("aria-pressed",String((prefs.clearMode||"read")===k));x.onclick=()=>{prefs.clearMode=k;save();seg2.querySelectorAll("button").forEach(y=>y.setAttribute("aria-pressed",String(y===x)));render();};seg2.append(x);}
-  f1.append(seg2);fg.append(f1);b.append(fg);b.append(el("p","gfoot","Marking read keeps the email in your Gmail inbox. Archiving moves it out of the inbox (it stays in All Mail)."));
   b.append(el("div","ghead","Privacy & protection"));const pg=el("div","group ic");
-  switchRow(pg,"green",I.shield,false,"Block tracking pixels",null,true,null,true);
+  switchRow(pg,"green",I.shield,false,"Show images in emails","Senders can tell when you open an email",!!prefs.images,v=>{prefs.images=v;save();});
   switchRow(pg,"red",I.warn,false,"Warn me about scams",null,prefs.scam,v=>{prefs.scam=v;save();});
   switchRow(pg,"gray",I.party,false,"Celebration effects",null,prefs.celebrate,v=>{prefs.celebrate=v;save();});
-  b.append(pg);b.append(el("p","gfoot","Inlet shows mail as text and never loads images, so tracking pixels can't see when you open an email. Theme follows your phone's light or dark setting."));
+  b.append(pg);b.append(el("p","gfoot","With images off, tracking pixels can't see when you open an email. You can still tap Show images on any email. Theme follows your phone's light or dark setting."));
   b.append(el("div","ghead","Sorting"));const so=el("div","group ic");
   const act=(d,label,sub,fn)=>{const x=el("button");x.type="button";const l=el("span","label");l.append(el("span",null,label));x.append(chip("gray",d),l,el("span","val",sub),chev());x.onclick=fn;so.append(x);};
   act(I.reset,"Reset People and Feed choices",`${Object.keys(overrides).length}`,()=>{overrides={};save();render();openSettings();toast("Sorting reset.");});

@@ -169,6 +169,12 @@
     })(p);
     return plain || (html ? htmlToText(html) : "");
   }
+  function bodyHtml(p) {
+    let html = "";
+    (function walk(x) { if (!x || html) return; const mt = (x.mimeType || "").toLowerCase();
+      if (mt === "text/html" && x.body && x.body.data && !x.filename) { html = b64d(x.body.data); return; } (x.parts || []).forEach(walk); })(p);
+    return html.length > 600000 ? "" : html;
+  }
   function mapMsg(acc, m, withBody) {
     const p = m.payload || {};
     const o = {
@@ -178,7 +184,7 @@
       labelIds: m.labelIds || [], toRecipients: splitAddrs(hdr(p, "to")), ccRecipients: splitAddrs(hdr(p, "cc")),
       sizeEstimate: m.sizeEstimate || 0, account: acc.email,
     };
-    if (withBody) o.plaintextBody = bodyText(p);
+    if (withBody) { o.plaintextBody = bodyText(p); const h = bodyHtml(p); if (h) o.htmlBody = h; }
     return o;
   }
   const viewUrl = (acc, id) => "https://mail.google.com/mail/?authuser=" + encodeURIComponent(acc.email) + "#all/" + id;
@@ -264,6 +270,13 @@
     for (const k of [...cache.keys()]) if (k.startsWith(email + "|" + id + "|")) cache.delete(k);
     return {};
   }
+  async function label(input) {
+    const [email, id] = split(input.threadId); const acc = find(email);
+    if (!acc) throw err("tool_error", "That account was removed");
+    await g(acc, "threads/" + id + "/modify", { method: "POST", body: JSON.stringify({ addLabelIds: input.labelIds || [] }) });
+    for (const k of [...cache.keys()]) if (k.startsWith(email + "|" + id + "|")) cache.delete(k);
+    return {};
+  }
   async function createEvent(input) {
     const acc = (input.account && find(input.account)) || accounts.find(live) || accounts[0];
     if (!acc) throw err("not_granted");
@@ -283,6 +296,7 @@
       else if (server === "Gmail" && tool === "reply") payload = await reply(input);
       else if (server === "Gmail" && tool === "send_message") payload = await sendMessage(input);
       else if (server === "Gmail" && tool === "unlabel_thread") payload = await unlabel(input);
+      else if (server === "Gmail" && tool === "label_thread") payload = await label(input);
       else if (server === "Google Calendar" && tool === "create_event") payload = await createEvent(input);
       else throw err("not_in_manifest", tool);
       return { payload };

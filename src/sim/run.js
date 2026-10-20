@@ -9,7 +9,7 @@ async function open(b,persona,sim={},opt={}){
   const ctx=await b.newContext({locale:opt.locale||'en-US',reducedMotion:opt.rm?'reduce':'no-preference',viewport:opt.vp||{width:390,height:844},deviceScaleFactor:2,colorScheme:opt.dark?'dark':'light',hasTouch:false});
   const p=await ctx.newPage();await p.clock.install();
   p.on('pageerror',e=>note(persona,'bug',`JS error: ${e.message}`));
-  p.on('console',m=>{if(m.type()==='error')note(persona,'bug',`console error: ${m.text().slice(0,160)}`);});
+  p.on('console',m=>{if(m.type()==='error'&&!/Blocked script execution in 'about:srcdoc'/.test(m.text()))note(persona,'bug',`console error: ${m.text().slice(0,160)}`);});
   await p.setContent(`<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light}body{margin:0;font-size:14px}[hidden]{display:none!important}</style></head><body><script>window.__SIM=${JSON.stringify(sim)}</script><script>${MOCK}</script>${APP}</body></html>`);
   await p.waitForTimeout(400);if(!opt.keepWelcome&&await p.locator('#welcome').isVisible()){await p.click('#welcomeGo');await p.waitForTimeout(380);}return p;}
 async function shot(p,persona,name){const f=path.join(OUT,`${persona}-${name}.png`);await p.screenshot({path:f});shots.push(f);}
@@ -39,7 +39,7 @@ async function checks(p,persona,where){
       let h=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;h=Math.round(h*60);if(h<0)h+=360;return h;};
     const name=h=>h<15||h>=335?'red':h<45?'orange':h<70?'yellow':h<165?'green':h<200?'teal':h<255?'blue':h<290?'indigo':'purple';
     document.querySelectorAll('.app *').forEach(e=>{if(!vis(e))return;const rc=e.getBoundingClientRect();if(!rc.width||!rc.height||rc.bottom<0||rc.top>innerHeight)return;
-      if(e.closest('.av,.provider,.swipe .acts,svg,.ringcard'))return;const s=getComputedStyle(e);
+      if(e.closest('.av,.provider,.swipe .acts,svg,.ringcard,.tile,.stamp'))return;const s=getComputedStyle(e);
       const own=[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim());
       if(own){const fs=Math.round(parseFloat(s.fontSize));if(!SCALE.has(fs))offScale.set(fs,(e.className||e.tagName)+'');}
       const cs=[];if(own)cs.push(s.color);cs.push(s.backgroundColor);if(parseFloat(s.borderTopWidth)>0)cs.push(s.borderTopColor);
@@ -214,7 +214,16 @@ const T=(p,ms)=>p.clock.runFor(ms);
     await p.click('#tabFeed');await p.waitForTimeout(400);await p.locator('.fcard p').first().click();await p.waitForTimeout(900);
     if(!await p.locator('#reader').isVisible())note(P,'bug','tapping a Feed card did not open the reader');await shot(p,P,'1');await checks(p,P,'reader');
     await p.locator('#readerBody').evaluate(e=>e.scrollTop=400);await p.waitForTimeout(200);await shot(p,P,'2-scrolled');
-    await p.click('#rClear');await p.waitForTimeout(900);if(await p.locator('#reader').isVisible())note(P,'bug','Clear in reader did not close it');await shot(p,P,'3-after');await p.context().close();}
+    await p.click('#rRead');await p.waitForTimeout(900);if(await p.locator('#reader').isVisible())note(P,'bug','Clear in reader did not close it');await shot(p,P,'3-after');await p.context().close();}
+  // P32 rich HTML email in a conversation + safe rendering
+  for(const[nm,o]of[['light',{}],['dark',{dark:true}]]){const P='p32-html-'+nm;const p=await open(b,P,{},o);
+    await p.locator('.row',{hasText:'Chandler Bats'}).first().click();await p.waitForTimeout(1500);
+    if(!await p.locator('.mailcard').count())note(P,'bug','rich email did not render as an email card');await shot(p,P,'1-conv');await checks(p,P,'conv-html');
+    await p.locator('.mailcard').first().click();await p.waitForTimeout(1500);await shot(p,P,'2-reader');await checks(p,P,'reader-html');
+    const fr=p.frameLocator('#readerBody iframe');if(!/SHOP NOW/.test(await fr.locator('body').innerText().catch(()=>'')))note(P,'bug','email HTML not rendered in reader');
+    await p.locator('.imgbar button',{hasText:'Show images'}).click();await p.waitForTimeout(1200);await shot(p,P,'3-images');
+    if(await p.evaluate(()=>window.__pwned))note(P,'bug','email script ran');
+    await p.locator('#readerBody').evaluate(e=>e.scrollTop=9999);await p.waitForTimeout(300);await shot(p,P,'4-bottom');await p.context().close();}
   fs.writeFileSync(path.join(OUT,'issues.json'),JSON.stringify(issues,null,1));
   const by={};for(const i of issues){const k=i.sev+' | '+i.msg.replace(/\[[^\]]+\] /,'');by[k]=by[k]||new Set();by[k].add(i.persona);}
   console.log(`ROUND ${ROUND}: ${issues.length} findings, ${Object.keys(by).length} unique`);for(const[k,v]of Object.entries(by))console.log(`- ${k}  (${[...v].join(', ')})`);

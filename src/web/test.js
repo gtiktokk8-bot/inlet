@@ -11,14 +11,23 @@ function msg(id, tid, from, to, subj, body, h, labels, html) {
     : { mimeType: 'text/plain', headers, body: { data: b64u(body) } };
   return { id, threadId: tid, internalDate: H(h), snippet: body.replace(/<[^>]+>/g, '').slice(0, 90), labelIds: labels, sizeEstimate: 4000, payload };
 }
+function rich(id, tid, from, to, subj, text, html, h, labels) {
+  const headers = [{ name: 'From', value: from }, { name: 'To', value: to }, { name: 'Subject', value: subj }, { name: 'Message-ID', value: `<${id}@mail.test>` }];
+  return { id, threadId: tid, internalDate: H(h), snippet: text.slice(0, 90), labelIds: labels, sizeEstimate: 9000,
+    payload: { mimeType: 'multipart/alternative', headers, parts: [{ mimeType: 'text/plain', body: { data: b64u(text) } }, { mimeType: 'text/html', body: { data: b64u(html) } }] } };
+}
+const PROMO = '<table width="600"><tr><td><img src="https://img.test/hero.png" width="600" height="300"></td></tr><tr><td><h1>Premium satin finish</h1><p>Bats from $179.</p><a href="https://shop.test/now">SHOP NOW</a><a href="javascript:alert(1)">bad</a><img src="https://track.test/o.gif" width="1" height="1"><script>window.parent.__pwned=1</script><img src="x" onerror="window.parent.__pwned=2"></td></tr><tr><td><img src="https://img.test/a.png"></td></tr><tr><td><img src="https://img.test/b.png"></td></tr></table>';
 const DB = {
   [A]: { name: 'Gabe Trastoy', threads: {
     ta1: [msg('a1', 'ta1', 'Jordan Ellis <jordan@uni.edu>', A, 'Recruiting video', 'Do you have his showcase schedule?', 30, ['INBOX']),
           msg('a2', 'ta1', `Gabe Trastoy <${A}>`, 'jordan@uni.edu', 'Re: Recruiting video', 'Yep, PG Fall Classic Nov 7.', 28, ['SENT']),
           msg('a3', 'ta1', 'Jordan Ellis <jordan@uni.edu>', A, 'Re: Recruiting video', 'Perfect. Can you send grades by Friday?', 1, ['INBOX', 'UNREAD'])],
+    ta3: [msg('a5', 'ta3', 'Deals <deals@shop.test>', A, 'Flash sale', 'Everything 20% off.', 6, ['INBOX', 'UNREAD', 'CATEGORY_PROMOTIONS'])],
+    ta4: [msg('a6', 'ta4', 'Updates <updates@app.test>', A, 'Your weekly report', 'Here is your report.', 7, ['INBOX', 'CATEGORY_UPDATES'])],
     ta2: [msg('a4', 'ta2', 'Weekly Digest <news@letters.test>', A, 'Weekly digest #12', 'Top stories this week.\n\nRead the full story at https://letters.test/story/12 today.\n\nSee you next week.', 5, ['INBOX', 'UNREAD', 'CATEGORY_PROMOTIONS'])] } },
   [B]: { name: 'Gabe', threads: {
     tb1: [msg('b1', 'tb1', 'Maya Santos <maya@events.test>', B, 'Final invoice', 'The venue sent the final invoice.', 2, ['INBOX', 'UNREAD'])],
+    tb3: [rich('b3', 'tb3', 'Chandler Bats <mark@chandlerbats.test>', B, 'Premium satin finish', 'ON-DEMAND BATS $179 | [SHOP NOW](https://shop.test/now)', PROMO, 4, ['INBOX'])],
     tb2: [msg('b2', 'tb2', 'Coach Luis <luis@club.test>', B, 'Lineup', '<p>Lineup for <b>Saturday</b> attached.</p><p>Bus at 11.</p>', 3, ['INBOX'], true)] } },
 };
 const sent = [], events = [], modified = [];
@@ -29,9 +38,11 @@ const GIS = `window.google={accounts:{oauth2:{initTokenClient(cfg){return{reques
   const b = await chromium.launch();
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const p = await ctx.newPage(); await p.clock.install();
-  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); }); p.on('response', r => { if (r.status() === 404) errs.push('404 ' + r.url()); });
+  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/Blocked script execution in 'about:srcdoc'|status of 404/.test(m.text())) errs.push(m.text()); }); p.on('response', r => { if (r.status() === 404 && !/inlet\.test\/x$/.test(r.url())) errs.push('404 ' + r.url()); });
+  const imgReqs = [];
   await ctx.route('**/*', async route => {
     const req = route.request(); const u = new URL(req.url());
+    if (u.host === 'img.test' || u.host === 'track.test') { imgReqs.push(req.url()); return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }); }
     if (u.host === 'inlet.test' && u.pathname === '/api/auth/status') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: false, ai: false, accounts: [] }) });
     if (u.host === 'inlet.test') { const f = path.join(DIST, u.pathname === '/' ? 'index.html' : u.pathname); return fs.existsSync(f) ? route.fulfill({ path: f }) : route.fulfill({ status: 404 }); }
     if (u.host === 'accounts.google.com') return route.fulfill({ contentType: 'text/javascript', body: GIS });
@@ -48,7 +59,7 @@ const GIS = `window.google={accounts:{oauth2:{initTokenClient(cfg){return{reques
       return json({ threads: ids.map(id => ({ id, historyId: String(acct.threads[id].length) + acct.threads[id].map(x => x.labelIds.join()).join() })) });
     }
     let mm;
-    if ((mm = rest.match(/^threads\/([^/?]+)\/modify$/))) { const body = JSON.parse(req.postData()); modified.push({ email, id: mm[1], ...body }); acct.threads[mm[1]].forEach(x => x.labelIds = x.labelIds.filter(l => !body.removeLabelIds.includes(l))); return json({}); }
+    if ((mm = rest.match(/^threads\/([^/?]+)\/modify$/))) { const body = JSON.parse(req.postData()); body.removeLabelIds = body.removeLabelIds || []; body.addLabelIds = body.addLabelIds || []; modified.push({ email, id: mm[1], ...body }); acct.threads[mm[1]].forEach(x => x.labelIds = x.labelIds.filter(l => !body.removeLabelIds.includes(l)).concat(body.addLabelIds)); return json({}); }
     if ((mm = rest.match(/^threads\/([^/?]+)$/))) { const t = acct.threads[mm[1]]; return t ? json({ id: mm[1], messages: t }) : json({}, 404); }
     if (rest === 'messages/send') { const body = JSON.parse(req.postData()); const raw = Buffer.from(body.raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'); sent.push({ email, threadId: body.threadId, raw }); return json({ id: 'sent' + sent.length, threadId: body.threadId || 'new' }); }
     if ((mm = rest.match(/^messages\/([^/?]+)$/))) { const all = Object.values(acct.threads).flat(); const x = all.find(y => y.id === mm[1]); return x ? json(x) : json({}, 404); }
@@ -63,7 +74,7 @@ const GIS = `window.google={accounts:{oauth2:{initTokenClient(cfg){return{reques
   await p.locator('.gate .gbtn').first().click(); await p.waitForTimeout(800);
   ok(!(await p.locator('.gate').count()), 'sign-in screen closes after Google sign-in');
   ok(await p.locator('#peopleList .row', { hasText: 'Jordan Ellis' }).count() === 1, 'account A mail appears in People');
-  ok(await p.locator('#feedBadge').innerText() === '1', 'account A newsletter goes to Feed');
+  ok(await p.locator('#feedBadge').innerText() === '3', 'account A newsletters go to Feed');
   // add second account from Settings
   await p.click('#editBtn'); await p.waitForTimeout(600);
   await p.evaluate(e => { window.__next = [e]; }, B);
@@ -109,21 +120,49 @@ const GIS = `window.google={accounts:{oauth2:{initTokenClient(cfg){return{reques
   ok(s3 && s3.email === B && /^To: coach@example\.com/m.test(s3.raw) && /^Subject: Camp/m.test(s3.raw), 'new email sends from the chosen account');
   // Feed clear archives in the right account
   await p.click('#tabFeed'); await p.waitForTimeout(400);
-  // tap a Feed card to read the whole email
+  ok(await p.locator('.roundbtns .round').count() === 3 && /Flag/.test(await p.locator('.roundbtns .fl').getAttribute('data-l')) && /Read/.test(await p.locator('.roundbtns .rd').getAttribute('data-l')), 'Feed shows Flag, Archive, Read buttons');
+  const btnOrder = await p.locator('.roundbtns .round').evaluateAll(bs => bs.map(b => b.dataset.l).join(','));
+  ok(btnOrder === 'Flag,Archive,Read', 'buttons are Flag (left), Archive (middle), Read (right): ' + btnOrder);
+  const top = async () => (await p.locator('.fcard h2').innerText()).trim();
+  const tidOf = { 'Flash sale': 'ta3', 'Your weekly report': 'ta4', 'Weekly digest #12': 'ta2' };
+  // 1) tap to read
+  let t1 = await top();
   await p.locator('.fcard p').first().click(); await p.waitForTimeout(900);
-  const rtext = await p.locator('#readerBody').innerText();
-  ok(await p.locator('#reader').isVisible() && /Weekly digest #12/.test(rtext) && /See you next week/.test(rtext), 'tapping a Feed card opens the full email');
-  ok(await p.locator('#readerBody a', { hasText: 'letters.test' }).count() === 1, 'links in the email are tappable');
+  ok(await p.locator('#reader').isVisible(), 'tapping a Feed card opens the full email');
   await p.screenshot({ path: path.join(OUT, '7-reader.png') });
-  ok(modified.some(x => x.email === A && x.id === 'ta2' && x.removeLabelIds.includes('UNREAD')), 'opening it marks it read');
   await p.click('#readerBack'); await p.waitForTimeout(600);
-  ok(await p.locator('.fcard').count() === 1, 'going back leaves the card in the Feed');
-  const before = modified.length;
-  await p.locator('.roundbtns .round').first().click(); await p.waitForTimeout(800);
-  ok(!modified.slice(before).some(x => x.removeLabelIds.includes('INBOX')) && !modified.some(x => x.id === 'ta2' && x.removeLabelIds.includes('INBOX')), 'Feed Clear does NOT archive (stays in Gmail inbox)');
-  ok(!(await p.locator('.fcard').count()), 'cleared card leaves the Feed');
+  ok((await top()) === t1, 'going back leaves the card in the Feed');
+  // 2) swipe right = mark read (stays in inbox)
+  const drag = async (dx, dy) => { const bb = await p.locator('.fcard').boundingBox(); const x = bb.x + bb.width / 2, y = bb.y + 60;
+    await p.mouse.move(x, y); await p.mouse.down(); for (let i = 1; i <= 8; i++) await p.mouse.move(x + dx * i / 8, y + dy * i / 8); await p.mouse.up(); await p.waitForTimeout(900); };
+  t1 = await top(); await drag(180, 0);
+  const id1 = tidOf[t1]; const m1 = modified.filter(x => x.id === id1);
+  ok(!m1.some(x => x.removeLabelIds.includes('INBOX')) && (await top()) !== t1, 'swipe right marks read, keeps it in the Gmail inbox: ' + t1);
+  // 3) swipe left = flag (star)
+  t1 = await top(); await drag(-180, 0);
+  ok(modified.some(x => x.id === tidOf[t1] && x.addLabelIds.includes('STARRED')), 'swipe left flags it (starred in Gmail): ' + t1);
+  // 4) swipe down = archive
+  t1 = await top(); await drag(0, 220);
+  ok(modified.some(x => x.id === tidOf[t1] && x.removeLabelIds.includes('INBOX')), 'swipe down archives it: ' + t1);
+  await p.screenshot({ path: path.join(OUT, '8-feed-after.png') });
   await T(61000); await p.waitForTimeout(800);
-  ok(!(await p.locator('.fcard').count()), 'cleared card stays gone after the inbox refreshes');
+  ok(!(await p.locator('.fcard').count()), 'cleared cards stay gone after the inbox refreshes');
+  // rich HTML email in a conversation
+  await p.click('#tabPeople'); await p.waitForTimeout(400);
+  await p.locator('#peopleList .row', { hasText: 'Chandler Bats' }).click(); await p.waitForTimeout(1200);
+  ok(await p.locator('.mailcard').count() === 1, 'marketing email shows as an email card, not a text bubble');
+  await p.screenshot({ path: path.join(OUT, '9-mailcard.png') });
+  await p.locator('.mailcard').click(); await p.waitForTimeout(1200);
+  const fr = p.frameLocator('#readerBody iframe');
+  ok(/SHOP NOW/.test(await fr.locator('body').innerText()), 'full email renders with its real layout');
+  ok(await fr.locator('img').count() > 0 && await fr.locator('img').first().evaluate(i => getComputedStyle(i).display === 'none'), 'images stay off until you tap Show images');
+  ok(!(await fr.locator('script').count()) && !(await fr.locator('a[href^="javascript"]').count()), 'scripts and javascript: links are stripped');
+  ok(!(await p.evaluate(() => window.__pwned)), 'nothing inside the email can run code');
+  ok(!imgReqs.some(u => /track\.test/.test(u)), 'no tracking pixel loaded before Show images');
+  await p.locator('.imgbar button', { hasText: 'Show images' }).click(); await p.waitForTimeout(1200);
+  ok(imgReqs.some(u => /img\.test\/hero/.test(u)) && !imgReqs.some(u => /track\.test/.test(u)), 'Show images loads pictures but still drops the 1x1 tracking pixel');
+  await p.screenshot({ path: path.join(OUT, '10-html.png') });
+  await p.click('#readerBack'); await p.waitForTimeout(500); await p.click('#convBack'); await p.waitForTimeout(500);
   await p.click('#tabPeople'); await p.waitForTimeout(300);
   // token expiry -> reconnect banner
   await p.evaluate(e => { const a = window.__inletTest.accounts().find(x => x.email === e); a.exp = 0; }, A); await T(31000); await p.waitForTimeout(300);

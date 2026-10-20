@@ -3,7 +3,7 @@
 const SIM = window.__SIM || {};
 const now = Date.now();
 const iso = h => new Date(now - h*3600e3).toISOString();
-const ME = 'Me <me@example.com>';
+const ME = 'Gabe <gabe@guruconsultans.com>';
 let seq = 0; const mid = () => 'm' + (++seq);
 const threads = {};
 function thread(id, msgs, extraLabels){ // msgs: [from, hoursAgo, subject, body, labels]
@@ -12,7 +12,7 @@ function thread(id, msgs, extraLabels){ // msgs: [from, hoursAgo, subject, body,
     snippet: (body||'').replace(/\n/g,' ').slice(0,160).replace(/'/g,'&#39;'),
     plaintextBody: body, sizeEstimate: (body||'').length*3+3000,
     labelIds: [...(labels||[]), ...(from===ME?['SENT']:['INBOX']), ...(extraLabels||[])],
-    toRecipients: from===ME ? [msgs.find(m=>m[0]!==ME)?.[0] || 'someone@example.com'] : ['me@example.com'],
+    toRecipients: from===ME ? [msgs.find(m=>m[0]!==ME)?.[0] || 'someone@example.com'] : ['gabe@guruconsultans.com'],
   }));
   threads[id] = { id, messageCount: messages.length, viewUrl: 'https://mail.google.com/mail/#all/' + id, messages };
 }
@@ -21,7 +21,7 @@ const P = { jordan:'Jordan Ellis <jordan.ellis@university.edu>', maya:'Maya Sant
   long:'Maria-Fernanda de los Ángeles Gutiérrez-Villanueva <mf.gutierrez@universidaddeportiva.example.org>', bare:'coachmike77@yahoo.com',
   mom:'Mom <rosa.trastoy@gmail.com>' };
 const body = {
-  quoted: 'Perfect. Can you send his updated grades before Friday Oct 16 at 2pm?\n\nThanks,\nJordan\n--\nJordan Ellis | Recruiting Coordinator\nUniversity Athletics\n\nOn Tue, Oct 13, 2026 at 4:10 PM Me <me@example.com> wrote:\n> Yep, PG Fall Classic Nov 7 and Jupiter the week after.\n>\n> On Mon Jordan wrote:\n>> Do you have his showcase schedule?',
+  quoted: 'Perfect. Can you send his updated grades before Friday Oct 16 at 2pm?\n\nThanks,\nJordan\n--\nJordan Ellis | Recruiting Coordinator\nUniversity Athletics\n\nOn Tue, Oct 13, 2026 at 4:10 PM Gabe <gabe@guruconsultans.com> wrote:\n> Yep, PG Fall Classic Nov 7 and Jupiter the week after.\n>\n> On Mon Jordan wrote:\n>> Do you have his showcase schedule?',
   long: Array.from({length:30},(_,i)=>`Paragraph ${i+1}: Here are the detailed notes from the sponsor meeting covering pricing tiers, banner placement on the outfield wall, social media deliverables and the timeline for the spring season.`).join('\n\n'),
   url: 'Here is the shared folder: https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdefghijklmnopqrstuvwxyz and the deck https://docs.google.com/presentation/d/1zyxwvutsrqponmlkjihgfedcba/edit?usp=sharing',
 };
@@ -40,6 +40,10 @@ function buildNormal(){
   thread('t12', [['Amazon.com <shipment-tracking@amazon.com>', 9, 'Your package is out for delivery', 'Arriving today by 7 PM. Tracking 1Z999AA10123456784', ['CATEGORY_UPDATES']]]);
   thread('t13', [['Nike <nike@notifications.nike.com>', 30, 'Up to 40% off', '', ['CATEGORY_PROMOTIONS']]]);
   thread('t14', [['LinkedIn <messages-noreply@linkedin.com>', 12, 'You appeared in 14 searches', 'See who is looking at your profile', ['CATEGORY_SOCIAL']]]);
+  thread('t15', [['Chandler Bats <mark@chandlerbats.test>', 2, 'Premium satin finish meets high-density maple', 'ON-DEMAND BATS STARTING AT $179 | [SHOP NOW](https://chandlerbats.test/shop)\n\n[On-Demand Wood Bats](https://chandlerbats.test/wood)\n\nNo longer want to receive these emails? [Unsubscribe](https://lists.test/u)']]);
+  {const sq=c=>`<img width="560" height="200" alt="" src="data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='560' height='200'><rect width='560' height='200' fill='${c}'/></svg>`)}">`;
+   const html=`<table width="600" style="width:600px;margin:0 auto;font-family:Helvetica"><tr><td>${sq('#0b2545')}</td></tr><tr><td style="padding:24px"><h1 style="font-size:30px;margin:0 0 12px">Premium satin finish meets high-density maple</h1><p style="font-size:17px;color:#333">On-demand bats starting at $179. Built in Port St. Lucie.</p><p><a href="https://chandlerbats.test/shop" style="background:#c8102e;color:#fff;padding:14px 24px;border-radius:6px;text-decoration:none;font-weight:700">SHOP NOW</a></p></td></tr><tr><td>${sq('#8d0801')}</td></tr><tr><td style="padding:16px;font-size:12px;color:#888">No longer want these? <a href="https://lists.test/u">Unsubscribe</a><img src="https://track.test/open.gif" width="1" height="1"><script>window.parent.__pwned=1<\/script><img src="x" onerror="window.parent.__pwned=2"></td></tr></table>`;
+   threads.t15.messages[0].htmlBody=html; threads.t11.messages[0].htmlBody=html.replace('Premium satin finish meets high-density maple','What scouts are watching this fall');}
   for(let i=0;i<6;i++) thread('tn'+i, [[`Newsletter ${i} <news${i}@letters.example.com>`, 20+i*7, `Weekly digest #${120+i}`, 'Top stories this week in coaching and player development.', ['CATEGORY_PROMOTIONS']]]);
 }
 function buildHeavy(){ buildNormal(); for(let i=0;i<120;i++) thread('th'+i, [[`Person ${i} <person${i}@example.com>`, 40+i*4, `Question ${i}`, `Hi Gabe, quick question number ${i} about tryouts.`]]); }
@@ -49,7 +53,7 @@ const sent = [
   { id:'s1', messageCount:1, viewUrl:'https://mail.google.com/mail/#all/s1', messages:[{ id:mid(), threadId:'s1', date:iso(80), sender:ME, subject:'Camp invoice', snippet:'Attached is the invoice for the winter camp.', labelIds:['SENT'], toRecipients:['Ted Ab <ted@example.com>'] }]},
 ];
 const all = () => Object.values(threads).sort((a,b)=>new Date(b.messages.at(-1).date)-new Date(a.messages.at(-1).date));
-const preview = t => ({...t, messages: t.messages.slice(0,5).map(({plaintextBody,...m})=>m)});
+const preview = t => ({...t, messages: t.messages.slice(0,5).map(({plaintextBody,htmlBody,...m})=>m)});
 const err = (code,message) => Object.assign(new Error(message||code),{code,message:message||code,server:'Gmail'});
 const log = window.__CALLS = [];
 const wait = ms => new Promise(r=>setTimeout(r,ms));
