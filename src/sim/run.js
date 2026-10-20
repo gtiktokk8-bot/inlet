@@ -1,7 +1,7 @@
 // Inlet simulation runner: scripted personas + automatic checks. Usage: node run.js <round>
 const {chromium}=require('playwright');const fs=require('fs');const path=require('path');
 const ROUND=process.argv[2]||'r1';const OUT=path.join(__dirname,ROUND);fs.mkdirSync(OUT,{recursive:true});
-const APP=fs.readFileSync(path.join(__dirname,'..','app','inlet.html'),'utf8');const MOCK=fs.readFileSync(path.join(__dirname,'mockgmail.js'),'utf8');
+const APP=fs.readFileSync(path.join(__dirname,'..','inlet-gmail.html'),'utf8');const MOCK=fs.readFileSync(path.join(__dirname,'mockgmail.js'),'utf8');
 const issues=[];const shots=[];
 const note=(persona,sev,msg)=>{issues.push({persona,sev,msg});};
 
@@ -49,7 +49,7 @@ async function checks(p,persona,where){
     const lum=({r,g,b})=>{const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);};return .2126*f(r)+.7152*f(g)+.0722*f(b);};
     const bgOf=e=>{let x=e;while(x){const c=parse(getComputedStyle(x).backgroundColor);if(c&&c.a>.85)return c;x=x.parentElement;}return{r:255,g:255,b:255,a:1};};
     const lowC=new Set();document.querySelectorAll('.app *').forEach(e=>{if(!vis(e))return;if(!([...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim())))return;const rc=e.getBoundingClientRect();if(!rc.width||rc.bottom<0||rc.top>innerHeight)return;
-      const s=getComputedStyle(e);if(parseFloat(s.opacity)<.9||e.closest('[disabled],.ghost1,.ghost2,.scrim,.av,.fcard .tile'))return;let o=1,x=e;while(x){o*=parseFloat(getComputedStyle(x).opacity);x=x.parentElement;}if(o<.9)return;
+      const s=getComputedStyle(e);if(parseFloat(s.opacity)<.9||e.closest('[disabled],.ghost1,.ghost2,.scrim,.av,.fcard .tile,.reader .tile'))return;let o=1,x=e;while(x){o*=parseFloat(getComputedStyle(x).opacity);x=x.parentElement;}if(o<.9)return;
       const fg=parse(s.color);if(!fg)return;const bg=bgOf(e);const L1=lum(fg),L2=lum(bg);const cr=(Math.max(L1,L2)+.05)/(Math.min(L1,L2)+.05);const big=parseFloat(s.fontSize)>=18||(parseFloat(s.fontSize)>=14&&+s.fontWeight>=700);
       if(cr<(big?3:4.5))lowC.add(`"${e.textContent.trim().slice(0,18)}" ${cr.toFixed(1)}:1`);});
     if(lowC.size)out.push(['a11y',`low-contrast text: ${[...lowC].slice(0,5).join(' | ')}`]);
@@ -209,6 +209,12 @@ const T=(p,ms)=>p.clock.runFor(ms);
   for(const[nm,o]of[['light',{}],['dark',{dark:true}],['small',{vp:{width:320,height:568}}]]){const P='p30-welcome-'+nm;const p=await open(b,P,{},{...o,keepWelcome:true});
     if(!await p.locator('#welcome').isVisible())note(P,'bug','welcome screen not shown on first run');await shot(p,P,'1');await checks(p,P,'welcome');
     await p.click('#welcomeGo');await p.waitForTimeout(450);if(await p.locator('#welcome').isVisible())note(P,'bug','welcome screen did not close');await p.context().close();}
+  // P31 Feed reader (tap a card), light / dark / small
+  for(const[nm,o]of[['light',{}],['dark',{dark:true}],['small',{vp:{width:320,height:568}}]]){const P='p31-reader-'+nm;const p=await open(b,P,{},o);
+    await p.click('#tabFeed');await p.waitForTimeout(400);await p.locator('.fcard p').first().click();await p.waitForTimeout(900);
+    if(!await p.locator('#reader').isVisible())note(P,'bug','tapping a Feed card did not open the reader');await shot(p,P,'1');await checks(p,P,'reader');
+    await p.locator('#readerBody').evaluate(e=>e.scrollTop=400);await p.waitForTimeout(200);await shot(p,P,'2-scrolled');
+    await p.click('#rClear');await p.waitForTimeout(900);if(await p.locator('#reader').isVisible())note(P,'bug','Clear in reader did not close it');await shot(p,P,'3-after');await p.context().close();}
   fs.writeFileSync(path.join(OUT,'issues.json'),JSON.stringify(issues,null,1));
   const by={};for(const i of issues){const k=i.sev+' | '+i.msg.replace(/\[[^\]]+\] /,'');by[k]=by[k]||new Set();by[k].add(i.persona);}
   console.log(`ROUND ${ROUND}: ${issues.length} findings, ${Object.keys(by).length} unique`);for(const[k,v]of Object.entries(by))console.log(`- ${k}  (${[...v].join(', ')})`);

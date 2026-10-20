@@ -636,6 +636,32 @@ html,body{overscroll-behavior:none;overflow:hidden}
 .skel::after{content:"";position:absolute;left:64px;right:40px;top:18px;height:12px;border-radius:999px;background:rgba(120,120,128,.14);box-shadow:0 22px 0 -1px rgba(120,120,128,.10)}
 @media (prefers-reduced-motion: no-preference){.skel{animation:skelpulse 1.2s ease-in-out infinite alternate}}
 @keyframes skelpulse{from{opacity:1}to{opacity:.45}}
+
+/* ===== Feed reader ===== */
+#reader{background:var(--bg)}
+#readerBack,#readerGmail{width:44px;height:44px;border-radius:999px;color:var(--ink)!important;display:inline-flex;align-items:center;justify-content:center;padding:0!important;background:var(--glass);-webkit-backdrop-filter:var(--glassblur);backdrop-filter:var(--glassblur);box-shadow:inset 0 1px 0 var(--glass-hi),inset 0 0 0 .5px var(--glass-edge),0 2px 10px rgba(0,0,0,.06)}
+#readerBack svg{margin-right:2px}
+#readerBack:active,#readerGmail:active{transform:scale(.92);transition:transform .2s var(--spring)}
+.reader{flex:1;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;padding:6px 20px calc(110px + env(safe-area-inset-bottom,0px))}
+.reader .rsrc{display:flex;align-items:center;gap:10px;margin:4px 0 12px}
+.reader .rsrc .tile{width:36px;height:36px;flex-shrink:0;border-radius:8px;background:var(--avatar);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:16px}
+.reader .rsrc div{min-width:0}
+.reader .rsrc b{display:block;font-size:15px}
+.reader .rsrc span{display:block;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reader h1{font-size:28px;line-height:34px;font-weight:700;margin:0 0 16px;overflow-wrap:anywhere}
+.reader .rbody{-webkit-user-select:text;user-select:text}
+.reader .rbody p{font-size:17px;line-height:25px;margin:0 0 14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.reader .rbody a{color:var(--accent);text-decoration:none}
+.reader .rload{color:var(--muted)}
+.reader .scam{margin-bottom:14px}
+.readbar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(max(env(safe-area-inset-bottom,0px),12px) - 2px);display:flex;gap:4px;padding:6px;border-radius:999px;background:var(--glass);-webkit-backdrop-filter:var(--glassblur);backdrop-filter:var(--glassblur);box-shadow:inset 0 1px 0 var(--glass-hi),inset 0 0 0 .5px var(--glass-edge),var(--glass-sh);z-index:4}
+.readbar button{height:48px;min-width:118px;padding:0 20px;border:0;border-radius:999px;background:none;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+.readbar button:active{background:rgba(120,120,128,.14)}
+#rClear{color:var(--red)}#rKeep{color:var(--green)}
+.fcard{cursor:pointer}
+.fcard h2 .hl{all:unset;cursor:pointer;padding:3px 0;margin:-3px 0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+@media (max-height:640px){.fcard h2 .hl{-webkit-line-clamp:2}}
+.fcard h2 .hl:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
 </style>
 
 <div class="app" id="app">
@@ -732,6 +758,13 @@ html,body{overscroll-behavior:none;overflow:hidden}
     </div>
   </section>
 
+  <!-- FEED READER -->
+  <section class="push" id="reader" hidden aria-label="Email">
+    <div class="navrow"><button class="textbtn" id="readerBack" aria-label="Back to Feed"><svg width="11" height="18" viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg></button><span></span><a class="iconbtn" id="readerGmail" aria-label="Open in Gmail" target="_blank" rel="noopener"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a></div>
+    <div class="reader" id="readerBody"></div>
+    <div class="readbar"><button type="button" id="rClear"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>Clear</button><button type="button" id="rKeep"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7"/></svg>Keep</button></div>
+  </section>
+
   <!-- PERSON INFO -->
   <section class="push grouped" id="pinfo" hidden aria-label="Person info">
     <div class="navrow" style="padding-top:8px"><span></span><button class="textbtn" id="pinfoDone" style="font-weight:600">Done</button></div>
@@ -783,8 +816,8 @@ const MEM={};const store={get(k,d){try{const v=localStorage.getItem(k);if(v)retu
 
 const S={mcp:null,sample:null,threads:[],older:[],nextToken:null,sent:[],sentTo:new Set(),tab:"people",person:null,convMsgs:[],pending:null,search:null,showSnoozed:false,lastWaiting:null,draftAI:""};
 let prefs=store.get("inlet.prefs",{undo:10,scam:true,celebrate:true,aiOn:true});
-let overrides=store.get("inlet.overrides",{}),pins=store.get("inlet.pins",{}),snoozed=store.get("inlet.snoozed",{}),later=store.get("inlet.later",{}),kept=store.get("inlet.kept",{}),reminders=store.get("inlet.reminders",{});
-const save=()=>{store.set("inlet.prefs",prefs);store.set("inlet.overrides",overrides);store.set("inlet.pins",pins);store.set("inlet.snoozed",snoozed);store.set("inlet.later",later);store.set("inlet.kept",kept);store.set("inlet.reminders",reminders);};
+let overrides=store.get("inlet.overrides",{}),pins=store.get("inlet.pins",{}),snoozed=store.get("inlet.snoozed",{}),later=store.get("inlet.later",{}),kept=store.get("inlet.kept",{}),reminders=store.get("inlet.reminders",{}),cleared=store.get("inlet.cleared",{});
+const save=()=>{store.set("inlet.prefs",prefs);store.set("inlet.overrides",overrides);store.set("inlet.pins",pins);store.set("inlet.snoozed",snoozed);store.set("inlet.later",later);store.set("inlet.kept",kept);store.set("inlet.reminders",reminders);store.set("inlet.cleared",cleared);};
 
 /* ---------- motion ---------- */
 const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)");
@@ -902,7 +935,7 @@ function model(){
   let plist=[...people.values()].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const snoozedList=plist.filter(p=>snoozed[p.addr.email]&&new Date(snoozed[p.addr.email])>now);plist=plist.filter(p=>!snoozedList.includes(p));
   feed.sort((a,b)=>new Date(b.last.date)-new Date(a.last.date));
-  const fresh=feed.filter(f=>!kept[f.t.id]).sort((a,b)=>(later[a.t.id]||0)-(later[b.t.id]||0));
+  const fresh=feed.filter(f=>!kept[f.t.id]&&!(cleared[f.t.id]&&new Date(f.last.date).getTime()<=cleared[f.t.id])).sort((a,b)=>(later[a.t.id]||0)-(later[b.t.id]||0));
   // waiting on them: sent last, unanswered, 2+ days (or a reminder that came due)
   const waitingOn=[],seen=new Set();
   for(const t of S.sent){const msgs=sortMsgs(t);if(!msgs.length||t.messageCount>msgs.length)continue;const last=msgs[msgs.length-1];if(!isSent(last))continue;
@@ -996,7 +1029,7 @@ function renderFeed(fresh,T){
   const src=el("div","src");const nm=prettyName(f.addr);src.append(el("div","tile",nm[0].toUpperCase()));
   const sn=el("div","srcname");const kind=(f.last.labelIds||[]).includes("CATEGORY_PROMOTIONS")?"Promotion":(f.last.labelIds||[]).includes("CATEGORY_SOCIAL")?"Social":(f.last.labelIds||[]).includes("CATEGORY_UPDATES")?"Update":"Newsletter";
   sn.append(el("b",null,nm),el("span",null,`${kind} · ${when(f.last.date)}`));src.append(sn,el("span","mins",`${Math.max(1,Math.round((f.last.sizeEstimate||4000)/9000))} min`));
-  card.append(src,el("h2",null,decode(f.last.subject||"(no subject)")));
+  const h2=el("h2");const hb=el("button","hl",decode(f.last.subject||"(no subject)"));hb.type="button";h2.append(hb);card.append(src,h2);
   const sum=el("p",null,decode(f.last.snippet));card.append(sum);
   const sc=scamCheck(f.last);if(sc){const w=el("div","scam");w.append(el("span",null,`Says it's from ${sc.brand}, but came from ${sc.dom}. Don't click links.`));card.append(w);}
   const tags=el("div","tags");const fcode=findCode((f.last.subject||"")+" "+decode(f.last.snippet));
@@ -1006,17 +1039,18 @@ function renderFeed(fresh,T){
   if(S.sample&&prefs.aiOn){const ai=el("button",null,"Summarize");ai.type="button";ai.addEventListener("click",()=>feedSummary(f,sum,ai));tags.append(ai);}
   const stK=el("div","stamp keep","KEEP"),stC=el("div","stamp clear","CLEAR");card.append(tags,stK,stC);stack.append(card);body.append(stack);
   const rb=el("div","roundbtns");
-  const bx=el("button","round big");bx.type="button";bx.setAttribute("aria-label","Clear: archive in Gmail");bx.dataset.l="Clear";bx.style.color="var(--red)";bx.append(icon(I.x,26,false,2.4));
+  const bx=el("button","round big");bx.type="button";bx.setAttribute("aria-label",(prefs.clearMode||"read")==="archive"?"Clear: archive in Gmail":"Clear: mark as read");bx.dataset.l="Clear";bx.style.color="var(--red)";bx.append(icon(I.x,26,false,2.4));
   const bl=el("button","round mid");bl.type="button";bl.setAttribute("aria-label","Read later");bl.dataset.l="Later";bl.style.color="var(--muted)";bl.append(icon(I.clock,22,false,2.2));bl.addEventListener("click",()=>{later[f.t.id]=Date.now();save();render();});
-  const bk=el("button","round big");bk.type="button";bk.setAttribute("aria-label","Keep in inbox");bk.dataset.l="Keep";bk.style.color="var(--green)";bk.append(icon(I.check,28,false,2.4));
-  rb.append(bx,bl,bk);body.append(rb,el("div","swipehint","Swipe left to clear · right to keep"));
+  const bk=el("button","round big");bk.type="button";bk.setAttribute("aria-label","Keep unread in inbox");bk.dataset.l="Keep";bk.style.color="var(--green)";bk.append(icon(I.check,28,false,2.4));
+  rb.append(bx,bl,bk);body.append(rb,el("div","swipehint","Tap to read · swipe left to clear · right to keep"));
   let x0=null,dx=0;
-  card.addEventListener("pointerdown",e=>{if(e.target.closest("a,button"))return;x0=e.clientX;dx=0;card.setPointerCapture(e.pointerId);card.classList.add("dragging");});
-  card.addEventListener("pointermove",e=>{if(x0==null)return;dx=e.clientX-x0;card.style.transform=`translateX(${dx}px) rotate(${dx/24}deg)`;stK.style.opacity=Math.max(0,Math.min(1,dx/90));stC.style.opacity=Math.max(0,Math.min(1,-dx/90));});
+  let moved=false,y0=0;card.addEventListener("pointerdown",e=>{if(e.target.closest("a,button"))return;x0=e.clientX;y0=e.clientY;dx=0;moved=false;card.setPointerCapture(e.pointerId);card.classList.add("dragging");});
+  card.addEventListener("pointermove",e=>{if(x0==null)return;dx=e.clientX-x0;if(Math.abs(dx)>6||Math.abs(e.clientY-y0)>8)moved=true;card.style.transform=`translateX(${dx}px) rotate(${dx/24}deg)`;stK.style.opacity=Math.max(0,Math.min(1,dx/90));stC.style.opacity=Math.max(0,Math.min(1,-dx/90));});
   let flown=false;const fly=(dir,fn)=>{if(flown)return;flown=true;haptic();card.classList.remove("dragging");card.style.transform=`translateX(${dir*130}%) rotate(${dir*18}deg)`;setTimeout(fn,reduceMotion.matches?0:260);};
-  const end=()=>{if(x0==null)return;x0=null;if(dx<-90)fly(-1,()=>archive(f));else if(dx>90)fly(1,()=>{kept[f.t.id]=true;save();render();});else{card.classList.remove("dragging");card.style.transform="";stK.style.opacity=0;stC.style.opacity=0;}};
-  bx.onclick=()=>fly(-1,()=>archive(f));bk.onclick=()=>fly(1,()=>{kept[f.t.id]=true;save();render();toast("Kept in your inbox","Undo",()=>{delete kept[f.t.id];save();render();});});
+  const end=()=>{if(x0==null)return;x0=null;if(dx<-90)fly(-1,()=>clearItem(f));else if(Math.abs(dx)<6&&!moved){card.classList.remove("dragging");card.style.transform="";openReader(f,{clear:()=>bx.onclick(),keep:()=>bk.onclick()});}else if(dx>90)fly(1,()=>{kept[f.t.id]=true;save();render();});else{card.classList.remove("dragging");card.style.transform="";stK.style.opacity=0;stC.style.opacity=0;}};
+  bx.onclick=()=>fly(-1,()=>clearItem(f));bk.onclick=()=>fly(1,()=>{kept[f.t.id]=true;save();render();toast("Kept in your inbox","Undo",()=>{delete kept[f.t.id];save();render();});});
   card.addEventListener("pointerup",end);card.addEventListener("pointercancel",end);
+  hb.onclick=()=>openReader(f,{clear:()=>bx.onclick(),keep:()=>bk.onclick()});
 }
 function renderRing(M,waiting,done,pPct,fPct,fTotal,T,st){
   const d=new Date();$("ringDate").textContent=d.toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"});
@@ -1047,10 +1081,34 @@ function setTab(t){const was=S.tab;S.tab=t;$("scrPeople").hidden=t!=="people";$(
 $("tabPeople").onclick=()=>setTab("people");$("tabFeed").onclick=()=>setTab("feed");$("tabRing").onclick=()=>setTab("ring");
 $("segFeed").onclick=()=>setTab("feed");$("segPeople").onclick=()=>setTab("people");$("ringRow").onclick=()=>setTab("ring");
 
+async function clearItem(f){if((prefs.clearMode||"read")==="archive")return archive(f);
+  const id=f.t.id;bump("cleared");cleared[id]=new Date(f.last.date).getTime();const cut=Date.now()-45*864e5;for(const k in cleared)if(cleared[k]<cut)delete cleared[k];save();
+  const wasUnread=(f.t.messages||[]).some(m=>(m.labelIds||[]).includes("UNREAD"));(f.t.messages||[]).forEach(m=>{m.labelIds=(m.labelIds||[]).filter(l=>l!=="UNREAD");});render();
+  if(wasUnread){try{await S.mcp.callTool(GMAIL,"unlabel_thread",{threadId:id,labelIds:["UNREAD"]});}catch(e){toast(`Couldn't mark as read: ${errCopy(e)[0]}.`);}}}
 async function archive(f){const id=f.t.id;S.threads=S.threads.filter(t=>t.id!==id);S.older=S.older.filter(t=>t.id!==id);bump("cleared");render();
   try{await S.mcp.callTool(GMAIL,"unlabel_thread",{threadId:id,labelIds:["INBOX"]});}
   catch(e){toast(`Couldn't archive: ${errCopy(e)[0]}.`);try{await S.mcp.invalidate(GMAIL);}catch{}watchInbox();}}
 
+
+/* ---------- Feed reader: tap a card to read the whole email ---------- */
+function readerText(t){return String(t||"").replace(/[​‌‍͏­﻿]+/g,"").replace(/[ \t ]+\n/g,"\n").replace(/\n[ \t]+/g,"\n").replace(/\n{3,}/g,"\n\n").trim();}
+let readerActs=null;
+async function openReader(f,acts){readerActs=acts||null;const b=$("readerBody");b.replaceChildren();b.scrollTop=0;
+  const nm=prettyName(f.addr);const src=el("div","rsrc");src.append(el("div","tile",nm[0].toUpperCase()));const sn=el("div");sn.append(el("b",null,nm),el("span",null,`${f.addr.email} · ${when(f.last.date)}`));src.append(sn);
+  b.append(src,el("h1",null,decode(f.last.subject||"(no subject)")));
+  const sc=scamCheck(f.last);if(sc){const w=el("div","scam");w.append(el("span",null,`Says it's from ${sc.brand}, but came from ${sc.dom}. Don't click links.`));b.append(w);}
+  const body=el("div","rbody");body.append(el("p","rload","Loading…"));b.append(body);
+  $("readerGmail").href=safeUrl(f.t.viewUrl);push("reader");
+  try{const r=await S.mcp.callTool(GMAIL,"get_thread",{threadId:f.t.id,messageFormat:"PLAIN_TEXT"},{cache:{staleTime:300000}});
+    const m=((r.payload&&r.payload.messages)||[]).slice().sort((a,c)=>new Date(a.date)-new Date(c.date)).at(-1)||{};
+    let txt=readerText(m.plaintextBody||decode(f.last.snippet));const cut=txt.length>40000;if(cut)txt=txt.slice(0,40000);
+    body.replaceChildren();for(const para of txt.split(/\n\n+/)){const pEl=el("p");fillText(pEl,para);body.append(pEl);}
+    if(cut){const more=el("a",null,"Read the rest in Gmail");more.href=safeUrl(f.t.viewUrl);more.target="_blank";more.rel="noopener";body.append(more);}
+    if((m.labelIds||[]).includes("UNREAD")||f.unread){S.mcp.callTool(GMAIL,"unlabel_thread",{threadId:f.t.id,labelIds:["UNREAD"]}).then(()=>{(f.t.messages||[]).forEach(x=>{x.labelIds=(x.labelIds||[]).filter(l=>l!=="UNREAD");});}).catch(()=>{});}}
+  catch(e){body.replaceChildren(el("p","rload",`Couldn't load this email: ${errCopy(e)[0]}.`));}}
+$("readerBack").onclick=()=>pop("reader");edgeSwipe("reader");
+$("rClear").onclick=()=>{const a=readerActs;pop("reader",()=>a&&a.clear());};
+$("rKeep").onclick=()=>{const a=readerActs;pop("reader",()=>a&&a.keep());};
 /* ---------- conversation ---------- */
 async function openPerson(p,prefill){
   S.person=p;S.convMsgs=[];closeMenu();$("aiCard").hidden=true;$("draftCard").hidden=true;
@@ -1249,6 +1307,11 @@ function openSettings(){const b=$("setBody");b.replaceChildren();if(window.Inlet
   const seg=el("div","segsmall");seg.style.gridTemplateColumns="repeat(4,minmax(0,1fr))";
   for(const s of[5,10,20,30]){const x=el("button",null,`${s} s`);x.type="button";x.setAttribute("aria-pressed",String(prefs.undo===s));x.onclick=()=>{prefs.undo=s;save();seg.querySelectorAll("button").forEach(y=>y.setAttribute("aria-pressed",String(y===x)));};seg.append(x);}
   r1.append(seg);sg.append(r1);b.append(sg);
+  b.append(el("div","ghead","Feed"));const fg=el("div","group ic");const f1=el("div");f1.style.flexDirection="column";f1.style.alignItems="stretch";f1.style.paddingTop="10px";
+  const f1h=el("div");f1h.style.cssText="display:flex;align-items:center;gap:12px";f1h.append(chip("gray",I.x),el("span",null,"Clearing a card"));f1.append(f1h);
+  const seg2=el("div","segsmall");seg2.style.gridTemplateColumns="repeat(2,minmax(0,1fr))";
+  for(const[k,lab]of[["read","Marks it read"],["archive","Archives it"]]){const x=el("button",null,lab);x.type="button";x.setAttribute("aria-pressed",String((prefs.clearMode||"read")===k));x.onclick=()=>{prefs.clearMode=k;save();seg2.querySelectorAll("button").forEach(y=>y.setAttribute("aria-pressed",String(y===x)));render();};seg2.append(x);}
+  f1.append(seg2);fg.append(f1);b.append(fg);b.append(el("p","gfoot","Marking read keeps the email in your Gmail inbox. Archiving moves it out of the inbox (it stays in All Mail)."));
   b.append(el("div","ghead","Privacy & protection"));const pg=el("div","group ic");
   switchRow(pg,"green",I.shield,false,"Block tracking pixels",null,true,null,true);
   switchRow(pg,"red",I.warn,false,"Warn me about scams",null,prefs.scam,v=>{prefs.scam=v;save();});

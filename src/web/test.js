@@ -16,7 +16,7 @@ const DB = {
     ta1: [msg('a1', 'ta1', 'Jordan Ellis <jordan@uni.edu>', A, 'Recruiting video', 'Do you have his showcase schedule?', 30, ['INBOX']),
           msg('a2', 'ta1', `Gabe Trastoy <${A}>`, 'jordan@uni.edu', 'Re: Recruiting video', 'Yep, PG Fall Classic Nov 7.', 28, ['SENT']),
           msg('a3', 'ta1', 'Jordan Ellis <jordan@uni.edu>', A, 'Re: Recruiting video', 'Perfect. Can you send grades by Friday?', 1, ['INBOX', 'UNREAD'])],
-    ta2: [msg('a4', 'ta2', 'Weekly Digest <news@letters.test>', A, 'Weekly digest #12', 'Top stories this week.', 5, ['INBOX', 'CATEGORY_PROMOTIONS'])] } },
+    ta2: [msg('a4', 'ta2', 'Weekly Digest <news@letters.test>', A, 'Weekly digest #12', 'Top stories this week.\n\nRead the full story at https://letters.test/story/12 today.\n\nSee you next week.', 5, ['INBOX', 'UNREAD', 'CATEGORY_PROMOTIONS'])] } },
   [B]: { name: 'Gabe', threads: {
     tb1: [msg('b1', 'tb1', 'Maya Santos <maya@events.test>', B, 'Final invoice', 'The venue sent the final invoice.', 2, ['INBOX', 'UNREAD'])],
     tb2: [msg('b2', 'tb2', 'Coach Luis <luis@club.test>', B, 'Lineup', '<p>Lineup for <b>Saturday</b> attached.</p><p>Bus at 11.</p>', 3, ['INBOX'], true)] } },
@@ -108,8 +108,22 @@ const GIS = `window.google={accounts:{oauth2:{initTokenClient(cfg){return{reques
   const s3 = sent[sent.length - 1];
   ok(s3 && s3.email === B && /^To: coach@example\.com/m.test(s3.raw) && /^Subject: Camp/m.test(s3.raw), 'new email sends from the chosen account');
   // Feed clear archives in the right account
-  await p.click('#tabFeed'); await p.waitForTimeout(400); await p.locator('.roundbtns .round').first().click(); await p.waitForTimeout(800);
-  ok(modified.some(x => x.email === A && x.id === 'ta2' && x.removeLabelIds.includes('INBOX')), 'Feed Clear archives in the account it came to');
+  await p.click('#tabFeed'); await p.waitForTimeout(400);
+  // tap a Feed card to read the whole email
+  await p.locator('.fcard p').first().click(); await p.waitForTimeout(900);
+  const rtext = await p.locator('#readerBody').innerText();
+  ok(await p.locator('#reader').isVisible() && /Weekly digest #12/.test(rtext) && /See you next week/.test(rtext), 'tapping a Feed card opens the full email');
+  ok(await p.locator('#readerBody a', { hasText: 'letters.test' }).count() === 1, 'links in the email are tappable');
+  await p.screenshot({ path: path.join(OUT, '7-reader.png') });
+  ok(modified.some(x => x.email === A && x.id === 'ta2' && x.removeLabelIds.includes('UNREAD')), 'opening it marks it read');
+  await p.click('#readerBack'); await p.waitForTimeout(600);
+  ok(await p.locator('.fcard').count() === 1, 'going back leaves the card in the Feed');
+  const before = modified.length;
+  await p.locator('.roundbtns .round').first().click(); await p.waitForTimeout(800);
+  ok(!modified.slice(before).some(x => x.removeLabelIds.includes('INBOX')) && !modified.some(x => x.id === 'ta2' && x.removeLabelIds.includes('INBOX')), 'Feed Clear does NOT archive (stays in Gmail inbox)');
+  ok(!(await p.locator('.fcard').count()), 'cleared card leaves the Feed');
+  await T(61000); await p.waitForTimeout(800);
+  ok(!(await p.locator('.fcard').count()), 'cleared card stays gone after the inbox refreshes');
   await p.click('#tabPeople'); await p.waitForTimeout(300);
   // token expiry -> reconnect banner
   await p.evaluate(e => { const a = window.__inletTest.accounts().find(x => x.email === e); a.exp = 0; }, A); await T(31000); await p.waitForTimeout(300);
