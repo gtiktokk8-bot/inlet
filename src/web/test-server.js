@@ -14,13 +14,13 @@ const DB = {
                                           ta2: [msg('a2', 'ta2', 'Weekly Digest <news@letters.test>', A, 'Weekly digest', 'Top stories.', 5, ['INBOX', 'CATEGORY_PROMOTIONS'])] } },
   [C]: { name: 'Christen', threads: { tc1: [msg('c1', 'tc1', 'Maria Lopez <maria@venue.test>', C, 'Tasting', 'Tasting is set for Saturday at 2.', 2, ['INBOX'])] } },
 };
-const session = new Set(); let tokenCalls = 0, exchangeCalls = 0, needConsentOnce = new Set([C]), revokedServer = new Set(), aiPrompts = [], gen = 0;
+const session = new Set(); let listCalls = 0, tokenCalls = 0, exchangeCalls = 0, needConsentOnce = new Set([C]), revokedServer = new Set(), aiPrompts = [], gen = 0;
 const tokOf = e => 'tok-' + e + '-' + (++gen);
 const valid = new Map(); // token -> email
 const GIS = `window.google={accounts:{oauth2:{initCodeClient(cfg){return{requestCode(){const e=cfg.login_hint||(window.__next||[]).shift();setTimeout(()=>e?cfg.callback({code:'code-'+e}):cfg.error_callback({type:'popup_closed'}),20);}}},initTokenClient(){throw new Error('token client should not be used in server mode')},hasGrantedAllScopes(){return true},revoke(t,cb){cb&&cb()}}}};`;
 (async () => {
   const b = await chromium.launch();
-  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
   const p = await ctx.newPage(); await p.clock.install();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/status of 40[19]/.test(m.text())) errs.push(m.text()); });
   await ctx.route('**/*', async route => {
@@ -46,7 +46,7 @@ const GIS = `window.google={accounts:{oauth2:{initCodeClient(cfg){return{request
     if (!acct) return json({ error: { message: 'unauth' } }, 401);
     const m = u.pathname.match(/\/gmail\/v1\/users\/me\/(.*)$/); if (!m) return json({ id: 'x' });
     const rest = m[1]; let mm;
-    if (rest === 'threads') { const q = u.searchParams.get('q') || ''; const ids = Object.keys(acct.threads).filter(id => q.includes('in:sent') ? false : acct.threads[id].some(x => x.labelIds.includes('INBOX'))); return json({ threads: ids.map(id => ({ id, historyId: '1' + acct.threads[id].map(x => x.labelIds.join()).join() })) }); }
+    if (rest === 'threads') { listCalls++; const q = u.searchParams.get('q') || ''; const ids = Object.keys(acct.threads).filter(id => q.includes('in:sent') ? false : acct.threads[id].some(x => x.labelIds.includes('INBOX'))); return json({ threads: ids.map(id => ({ id, historyId: '1' + acct.threads[id].map(x => x.labelIds.join()).join() })) }); }
     if ((mm = rest.match(/^threads\/([^/?]+)\/modify$/))) { const bd = JSON.parse(req.postData()); acct.threads[mm[1]].forEach(x => x.labelIds = x.labelIds.filter(l => !bd.removeLabelIds.includes(l))); return json({}); }
     if ((mm = rest.match(/^threads\/([^/?]+)$/))) { const t = acct.threads[mm[1]]; return t ? json({ id: mm[1], messages: t }) : json({}, 404); }
     return json({}, 404);
@@ -84,6 +84,17 @@ const GIS = `window.google={accounts:{oauth2:{initCodeClient(cfg){return{request
   ok(/send the grades by Friday/.test(await p.locator('#draftText').innerText()), 'reply draft appears');
   await p.screenshot({ path: path.join(OUT, '2-draft.png') });
   await p.click('#convBack'); await p.waitForTimeout(500);
+  // instant launch cache + pull to refresh
+  const cache = await p.evaluate(() => localStorage.getItem('inlet.cache') || '');
+  ok(/Jordan Ellis/.test(cache) && !/plaintextBody/.test(cache), 'inbox list is cached on the phone for instant launch (no email bodies)');
+  const lc = listCalls;
+  await p.evaluate(async () => { const s = document.getElementById('scrPeople'); s.scrollTop = 0;
+    const t = y => new Touch({ identifier: 1, target: s, clientX: 200, clientY: y });
+    s.dispatchEvent(new TouchEvent('touchstart', { touches: [t(120)], bubbles: true }));
+    for (const y of [160, 220, 280, 330]) s.dispatchEvent(new TouchEvent('touchmove', { touches: [t(y)], bubbles: true }));
+    s.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true })); });
+  await p.waitForTimeout(150); await p.screenshot({ path: path.join(OUT, '5-pull.png') }); await T(1500); await p.waitForTimeout(800);
+  ok(listCalls > lc, 'pulling down the People list refreshes mail');
   // add a second account that needs one more approval
   await p.click('#editBtn'); await p.waitForTimeout(600);
   ok(/stays signed in/.test(await p.locator('#setBody').innerText()), 'Settings says the account stays signed in');

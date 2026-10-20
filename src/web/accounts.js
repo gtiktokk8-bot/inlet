@@ -109,7 +109,7 @@
     const a = find(email);
     if (SRV.enabled) post("/api/auth/remove", { email }).catch(() => {});
     else if (a && a.token && window.google && google.accounts && google.accounts.oauth2) { try { google.accounts.oauth2.revoke(a.token, () => {}); } catch {} }
-    accounts = accounts.filter(x => x.email !== email); save(); cache.clear(); emit();
+    accounts = accounts.filter(x => x.email !== email); save(); cache.clear(); try { localStorage.removeItem("inlet.cache"); } catch {} emit();
   }
 
   /* ---------- HTTP ---------- */
