@@ -28,7 +28,7 @@ head = f"""<!doctype html>
 <link rel="manifest" href="/manifest.webmanifest">
 <style>html,body{{margin:0;height:100%}}body{{padding-top:env(safe-area-inset-top)}}</style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script>window.INLET_CLIENT_ID={json.dumps(cid)};</script>
+<script>window.INLET_CLIENT_ID={json.dumps(cid)};window.INLET_BUILD={json.dumps(__import__("datetime").datetime.now().strftime("%b %d, %H:%M"))};</script>
 <script>{acc}</script>
 </head>
 <body>

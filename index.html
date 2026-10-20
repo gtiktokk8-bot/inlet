@@ -16,13 +16,13 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <style>html,body{margin:0;height:100%}body{padding-top:env(safe-area-inset-top)}</style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script>window.INLET_CLIENT_ID="563715878928-ll5nno80bdd0rkaa1l2fmuq28idtht2t.apps.googleusercontent.com";</script>
+<script>window.INLET_CLIENT_ID="563715878928-ll5nno80bdd0rkaa1l2fmuq28idtht2t.apps.googleusercontent.com";window.INLET_BUILD="Oct 20, 07:37";</script>
 <script>/* Inlet standalone: multi-account Google sign-in + Gmail/Calendar REST adapter.
    Exposes the same window.claude.use("mcp") interface the app already uses inside Claude,
    so the app code is identical in both builds. No server: the browser talks to Google directly. */
 (function () {
   "use strict";
-  const CLIENT_ID = window.INLET_CLIENT_ID || "";
+  const CLIENT_ID = window.INLET_CLIENT_ID || "563715878928-ll5nno80bdd0rkaa1l2fmuq28idtht2t.apps.googleusercontent.com"; // public OAuth client ID
   const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.modify";
   const SCOPES = ["openid", "email", "profile", GMAIL_SCOPE, "https://www.googleapis.com/auth/calendar.events"].join(" ");
   const LS = "inlet.accounts";
@@ -350,6 +350,7 @@
     gate.innerHTML = '<div class="wicon" aria-hidden="true"><svg width="54" height="54" viewBox="0 0 24 24" fill="#fff"><path d="M12 3.5c5 0 9 3.4 9 7.6s-4 7.6-9 7.6c-1 0-2-.1-2.9-.4L5 20.2l.9-3.6C4 15.2 3 13.3 3 11.1 3 6.9 7 3.5 12 3.5Z"/></svg></div>' +
       (deadList.length ? "<h1>Welcome back</h1><p>" + (SRV.enabled ? "Sign in once more and Inlet will keep you signed in from now on." : "Google asks you to sign in again every hour while Inlet is in testing.") + "</p>" : "<h1>Sign in to Inlet</h1><p>Add your Gmail. You can add more accounts later in Settings.</p>");
     const box = document.createElement("div"); box.style.cssText = "width:100%;display:flex;flex-direction:column;align-items:center";
+    const ver = document.createElement("p"); ver.className = "gnote"; ver.style.opacity = ".6"; ver.textContent = "Inlet " + (window.INLET_BUILD || "dev") + " · " + location.host;
     const msg = document.createElement("p"); msg.className = "gnote";
     msg.textContent = "Inlet talks to Gmail straight from this phone. Your mail is never stored on a server. If Google says the app isn't verified yet, tap Continue.";
     const go = async (hint, btn) => {
@@ -362,7 +363,7 @@
     const add = document.createElement("button"); add.type = "button"; add.className = "gbtn" + (deadList.length ? "" : " primary");
     add.innerHTML = (deadList.length ? "" : G_ICON) + "<span></span>"; add.querySelector("span").textContent = deadList.length ? "Use a different account" : "Continue with Google";
     if (!deadList.length) { add.className = "gbtn"; }
-    add.onclick = () => go(null, add); box.append(add, msg); gate.append(box);
+    add.onclick = () => go(null, add); box.append(add, msg, ver); gate.append(box);
     document.getElementById("app").append(gate);
   }
   function paintBanner() {
