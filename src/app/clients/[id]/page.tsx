@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { clientBook, targetStatus, targetHistory, authUsage } from "@/lib/queries";
-import { sessionSeries, mastered, countStats, isStale } from "@/lib/clinical";
+import { sessionSeries, mastered, effective, isStale } from "@/lib/clinical";
 import { Shell } from "@/components/Shell";
 import { Card, PageTitle, Pill, Btn, fmtDate } from "@/components/ui";
 import { TrendChart } from "@/components/TrendChart";
@@ -39,10 +39,9 @@ export default async function ClientPage({ params, searchParams }: { params: Pro
       }
     } else if (selected.data_type === "frequency") {
       const by = new Map<string, number>();
-      for (const e of events) by.set(e.session_id, (by.get(e.session_id) ?? 0) + (e.kind === "count" ? 1 : 0));
+      for (const e of effective(events)) by.set(e.session_id, (by.get(e.session_id) ?? 0) + (e.kind === "count" ? 1 : 0));
       chart = [...by.entries()].map(([sid, n]) => ({ date: dates[sid], value: n })).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
       unit = ""; yMax = Math.max(10, ...chart.map((c) => c.value));
-      void countStats;
     } else if (selected.data_type === "task_analysis") {
       unit = "%";
     }

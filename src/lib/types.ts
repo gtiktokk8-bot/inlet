@@ -55,7 +55,8 @@ export type EventKind =
   | "episode_start"
   | "episode_end"
   | "ta_step"
-  | "note";
+  | "note"
+  | "correction";   // payload: { corrects: <event id>, kind?: new kind, payload?: new payload, void?: true }
 
 export type SessionEvent = {
   id: string;

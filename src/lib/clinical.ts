@@ -1,8 +1,30 @@
 import type { SessionEvent, Target } from "./types";
 
+/**
+ * Corrections are themselves events (append-only, auditable). This resolves them:
+ * a correction replaces the kind/payload of the event it points at, or voids it.
+ * Later corrections win. Correction events themselves are not returned.
+ */
+export function effective(events: SessionEvent[]): SessionEvent[] {
+  const fixes = new Map<string, { kind?: string; payload?: Record<string, unknown>; void?: boolean }>();
+  for (const e of [...events].sort((a, b) => a.device_seq - b.device_seq)) {
+    if (e.kind !== "correction") continue;
+    const id = String(e.payload.corrects ?? "");
+    const prev = fixes.get(id) ?? {};
+    fixes.set(id, { ...prev, ...(e.payload as typeof prev) });
+  }
+  return events
+    .filter((e) => e.kind !== "correction" && !fixes.get(e.id)?.void)
+    .map((e) => {
+      const f = fixes.get(e.id);
+      return f ? { ...e, kind: (f.kind ?? e.kind) as SessionEvent["kind"], payload: f.payload ?? e.payload } : e;
+    });
+}
+
 export type TrialStats = { n: number; independent: number; prompted: number; incorrect: number; pct: number | null };
 
-export function trialStats(events: SessionEvent[]): TrialStats {
+export function trialStats(raw: SessionEvent[]): TrialStats {
+  const events = effective(raw);
   let independent = 0, prompted = 0, incorrect = 0;
   for (const e of events) {
     if (e.kind === "trial_independent") independent++;
@@ -14,12 +36,12 @@ export function trialStats(events: SessionEvent[]): TrialStats {
 }
 
 export function countStats(events: SessionEvent[]) {
-  return events.filter((e) => e.kind === "count").length;
+  return effective(events).filter((e) => e.kind === "count").length;
 }
 
 /** Pairs episode_start/episode_end events into durations (seconds). An open episode counts to `now`. */
 export function durationStats(events: SessionEvent[], now = Date.now()) {
-  const sorted = [...events].sort((a, b) => a.device_seq - b.device_seq);
+  const sorted = [...effective(events)].sort((a, b) => a.device_seq - b.device_seq);
   const episodes: { start: string; end: string | null; seconds: number }[] = [];
   let open: string | null = null;
   for (const e of sorted) {
@@ -37,7 +59,7 @@ export function durationStats(events: SessionEvent[], now = Date.now()) {
 /** Task analysis: latest result per step. result 1 = independent, 2 = prompted, 0 = not run */
 export function taStats(events: SessionEvent[], steps: string[]) {
   const latest: number[] = steps.map(() => 0);
-  for (const e of [...events].sort((a, b) => a.device_seq - b.device_seq)) {
+  for (const e of [...effective(events)].sort((a, b) => a.device_seq - b.device_seq)) {
     if (e.kind !== "ta_step") continue;
     const i = Number(e.payload.step_index);
     const r = Number(e.payload.result);

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Client, Session, SessionEvent, Target, EventKind } from "@/lib/types";
 import { appendEvent, localEvents, sync, pendingCount, saveSessionLocal } from "@/lib/offline";
-import { summarize, trialStats, durationStats, taStats, isStale } from "@/lib/clinical";
+import { summarize, trialStats, durationStats, taStats, isStale, effective } from "@/lib/clinical";
 
 type T = Target & { program_name: string };
 
@@ -47,6 +47,12 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
     setPending(await pendingCount());
     sync().then(async () => setPending(await pendingCount())).catch(() => {});
   }, [session.id, session.org_id]);
+
+  /** Fix a previous tap. Appends a correction event; the original stays in the log for audit. */
+  const correct = useCallback((target: T, eventId: string, fix: { kind?: EventKind; payload?: Record<string, unknown>; void?: boolean }) => {
+    return record(target, "correction", { corrects: eventId, ...fix });
+  }, [record]);
+  const [editing, setEditing] = useState<string | null>(null);
 
   const ordered = useMemo(() => {
     const ran = new Set(events.map((e) => e.target_id));
@@ -135,7 +141,7 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
                   {t.data_type === "frequency" && (
                     <div className="grid grid-cols-[1fr_80px] gap-2">
                       <button onClick={() => record(t, "count")} className="min-h-[72px] rounded-xl bg-teal text-white text-[28px] font-bold">+1</button>
-                      <button onClick={() => record(t, "note", { text: "undo last count" })} aria-label="Flag last count as error" className="min-h-[72px] rounded-xl bg-white border border-[#cdd2da] text-sm font-semibold">Flag</button>
+                      <button onClick={() => { const last = effective(evs).filter((e) => e.kind === "count").at(-1); if (last) correct(t, last.id, { void: true }); }} aria-label="Undo last count" className="min-h-[72px] rounded-xl bg-white border border-[#cdd2da] text-sm font-semibold">Undo</button>
                     </div>
                   )}
 
@@ -165,6 +171,42 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
                       </div>
                     );
                   })()}
+
+                  {/* Recent entries — tap one to correct it. Original taps stay in the log; a correction is appended. */}
+                  {(t.data_type === "trial" || t.data_type === "frequency" || t.data_type === "duration") && effective(evs).length > 0 && (
+                    <div className="flex flex-col gap-1.5 pt-1 border-t border-line-soft">
+                      <div className="flex justify-between items-center pt-2">
+                        <div className="text-xs font-semibold text-muted uppercase tracking-wider">Recent entries</div>
+                        <div className="text-[11px] text-muted">tap to correct · newest first</div>
+                      </div>
+                      {effective(evs).slice(-8).reverse().map((e, i, arr) => {
+                        const n = effective(evs).length - i;
+                        const label = e.kind === "trial_independent" ? "Independent" : e.kind === "trial_prompted" ? `Prompted · ${String(e.payload.prompt_level ?? "")}` : e.kind === "trial_incorrect" ? "Incorrect" : e.kind === "count" ? "+1" : e.kind === "episode_start" ? "Episode start" : "Episode end";
+                        const time = new Date(e.recorded_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                        const corrected = evs.some((c) => c.kind === "correction" && c.payload.corrects === e.id);
+                        const isEd = editing === e.id;
+                        void arr;
+                        return (
+                          <div key={e.id} className={`rounded-[10px] border ${isEd ? "border-teal" : "border-line-soft"} bg-ground`}>
+                            <button onClick={() => setEditing(isEd ? null : e.id)} className="w-full min-h-11 px-3 flex justify-between items-center text-[13px]">
+                              <span><span className="text-muted tabular-nums mr-2">#{n}</span><b>{label}</b>{corrected && <span className="ml-2 text-[11px] text-amber-ink font-semibold">edited</span>}</span>
+                              <span className="text-muted text-xs">{time}</span>
+                            </button>
+                            {isEd && (
+                              <div className="px-2.5 pb-2.5 flex gap-1.5 flex-wrap">
+                                {t.data_type === "trial" && (["trial_independent", "trial_prompted", "trial_incorrect"] as EventKind[]).map((k) => (
+                                  <button key={k} disabled={k === e.kind} onClick={() => { correct(t, e.id, { kind: k, payload: k === "trial_prompted" ? { prompt_level: prompt } : {} }); setEditing(null); }} className={`min-h-9 px-3 rounded-full border text-xs font-semibold disabled:opacity-40 ${k === "trial_independent" ? "bg-teal text-white border-teal" : "bg-white border-[#cdd2da]"}`}>
+                                    {k === "trial_independent" ? "Independent" : k === "trial_prompted" ? `Prompted (${prompt})` : "Incorrect"}
+                                  </button>
+                                ))}
+                                <button onClick={() => { correct(t, e.id, { void: true }); setEditing(null); }} className="min-h-9 px-3 rounded-full border border-[#f5c2c2] bg-red-soft text-red text-xs font-semibold">Remove</button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
