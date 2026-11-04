@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
+// Every screen is per-user, per-org PHI behind auth: nothing is prerendered or cached across users.
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  cacheComponents: false,
   turbopack: {
     rules: {
       "*.css": {
