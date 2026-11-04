@@ -92,7 +92,7 @@ export function templateDraft(f: SessionFacts): string {
   const run = f.targets.filter((t) => t.summary !== "not run this session");
   const skipped = f.targets.filter((t) => t.summary === "not run this session");
   for (const t of run) {
-    if (t.dataType === "trial") lines.push(`${t.program} (${t.name}) was run for ${t.summary}; mastery criterion is ${t.mastery}.`);
+    if (t.dataType === "trial") lines.push(`${t.program}${t.name && t.name !== t.program ? ` (${t.name})` : ""} was run for ${t.summary}; mastery criterion is ${t.mastery}.`);
     else if (t.dataType === "frequency") lines.push(`${t.program}: ${t.summary}; the behavior intervention plan was followed as written.`);
     else if (t.dataType === "duration") lines.push(`${t.program}: ${t.summary}; the behavior intervention plan was followed as written.`);
     else lines.push(`${t.program} was practiced using the task analysis: ${t.summary}.`);

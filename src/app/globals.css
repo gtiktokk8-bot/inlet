@@ -1,21 +1,42 @@
 @import "tailwindcss";
 
+/* NotABAble — warm, calm, high-contrast. One accent (signal green) for "done / go",
+   one momentum color (gold) for progress-in-motion, red only for overdue. */
 @theme {
-  --color-ink: #15181e;
-  --color-muted: #5b6472;
-  --color-line: #e6e8ec;
-  --color-line-soft: #eef0f3;
-  --color-ground: #f6f7f9;
-  --color-teal: #0f766e;
-  --color-teal-soft: #e6f4f1;
-  --color-amber: #b45309;
-  --color-amber-ink: #9a5b00;
-  --color-amber-soft: #fff4e5;
-  --color-red: #b91c1c;
-  --color-red-soft: #fdecec;
+  --color-ink: #141a1f;
+  --color-muted: #5b6470;
+  --color-line: #e5e4df;
+  --color-line-soft: #efeeea;
+  --color-ground: #f7f6f2;
+  --color-card: #ffffff;
+  --color-teal: #0b7a62;
+  --color-teal-ink: #085c4a;
+  --color-teal-soft: #e3f2ec;
+  --color-gold: #c77d00;
+  --color-gold-ink: #8f5a00;
+  --color-gold-soft: #fff3df;
+  --color-amber: #c77d00;
+  --color-amber-ink: #8f5a00;
+  --color-amber-soft: #fff3df;
+  --color-red: #b42318;
+  --color-red-soft: #fdecea;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --radius-card: 14px;
 }
 
 html, body { background: var(--color-ground); color: var(--color-ink); }
 body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 button, input, textarea, select { font-family: inherit; }
+button:not(:disabled) { cursor: pointer; }
+button:active:not(:disabled) { transform: translateY(1px); }
+
+/* progress bars animate so filling feels earned */
+.bar > span { transition: width 400ms cubic-bezier(.2,.8,.2,1); }
+
+/* a tap that landed: brief green pulse */
+@keyframes landed { 0% { box-shadow: 0 0 0 0 rgba(11,122,98,.45);} 100% { box-shadow: 0 0 0 10px rgba(11,122,98,0);} }
+.landed { animation: landed 420ms ease-out; }
+
+/* checklist item flipping green */
+@keyframes pop { 0% { transform: scale(.8);} 60% { transform: scale(1.12);} 100% { transform: scale(1);} }
+.pop { animation: pop 260ms ease-out; }

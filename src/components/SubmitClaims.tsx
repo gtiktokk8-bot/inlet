@@ -12,7 +12,7 @@ export function SubmitClaims({ ids, rows }: { ids: string[]; rows: { dos: string
   }
   return (
     <div className="flex gap-2">
-      <button disabled={!ids.length} onClick={exportCsv} className="min-h-10 px-3.5 rounded-[10px] border border-[#cdd2da] bg-white text-sm font-semibold disabled:opacity-50">Export CSV ({ids.length})</button>
+      <button disabled={!ids.length} onClick={exportCsv} className="min-h-10 px-3.5 rounded-[10px] border border-[#cfcdc6] bg-card text-sm font-semibold disabled:opacity-50">Export CSV ({ids.length})</button>
       <button disabled={!ids.length || busy} onClick={async () => { setBusy(true); await markClaimsSubmitted(ids); setBusy(false); }} className="min-h-10 px-3.5 rounded-[10px] bg-ink text-white text-sm font-semibold disabled:opacity-50">Mark submitted</button>
     </div>
   );

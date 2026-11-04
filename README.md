@@ -1,6 +1,6 @@
-# ABA Platform (working name)
+# NotABAble
 
-Practice software for small ABA clinics. Built for the session, in the room, on a phone.
+Notes. Data. Done. — ABA practice software built for the session, in the room, on a phone.
 
 **Three promises, in priority order**
 

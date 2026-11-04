@@ -5,13 +5,15 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "ABA Platform",
-  description: "Sessions, notes, and billing for small ABA practices.",
+  title: { default: "NotABAble", template: "%s · NotABAble" },
+  description: "ABA practice software built for the session: data that never gets lost, notes that write themselves, claims from co-signed notes.",
   manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+  appleWebApp: { capable: true, title: "NotABAble", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0f766e",
+  themeColor: "#141a1f",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

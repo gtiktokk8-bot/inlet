@@ -9,12 +9,14 @@ export default async function Billing() {
   if (!profile) redirect("/login");
   const { data } = await supabase.from("claim_lines").select("*, clients(first_name, last_name), payers(name, type), profiles!claim_lines_rendering_provider_id_fkey(full_name, npi)").order("date_of_service", { ascending: false });
   type CL = { id: string; date_of_service: string; cpt_code: string; modifiers: string[]; units: number; place_of_service: string; status: string; clients: { first_name: string; last_name: string } | null; payers: { name: string; type: string } | null; profiles: { full_name: string; npi: string | null } | null };
-  const rows = (data ?? []) as CL[];
+  const all = (data ?? []) as CL[];
+  const invoices = all.filter((r) => r.payers?.type === "private_pay");
+  const rows = all.filter((r) => r.payers?.type !== "private_pay");
   const ready = rows.filter((r) => r.status === "ready");
   const sum = (xs: CL[]) => xs.reduce((s, r) => s + r.units, 0);
   return (
     <Shell profile={profile} active="/billing">
-      <PageTitle title="Billing" sub="Claim lines are generated from co-signed notes. Nothing here was typed by hand." actions={<SubmitClaims ids={ready.map((r) => r.id)} rows={ready.map((r) => ({ dos: r.date_of_service, client: `${r.clients?.first_name} ${r.clients?.last_name}`, payer: r.payers?.name ?? "", cpt: r.cpt_code, units: r.units, pos: r.place_of_service, npi: r.profiles?.npi ?? "" }))} />} />
+      <PageTitle title="Billing" sub="Claim lines are generated from co-signed notes. Nothing here is typed by hand." actions={<SubmitClaims ids={ready.map((r) => r.id)} rows={ready.map((r) => ({ dos: r.date_of_service, client: `${r.clients?.first_name} ${r.clients?.last_name}`, payer: r.payers?.name ?? "", cpt: r.cpt_code, units: r.units, pos: r.place_of_service, npi: r.profiles?.npi ?? "" }))} />} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <Stat label="Ready to submit" value={ready.length} note={`${sum(ready)} units`} tone="teal" />
         <Stat label="Submitted" value={rows.filter((r) => r.status === "submitted").length} note={`${sum(rows.filter((r) => r.status === "submitted"))} units`} />
@@ -43,7 +45,15 @@ export default async function Billing() {
           </tbody>
         </table>
       </Card>
-      <div className="text-xs text-muted">v0 exports an 837P-ready CSV for upload to Claim.MD / Office Ally. Direct clearinghouse submission and 835 remittance posting come in v1. Private-pay sessions should be invoiced, not claimed — filter coming.</div>
+      {invoices.length > 0 && (
+        <Card>
+          <div className="px-4.5 py-3.5 border-b border-line flex justify-between items-center"><div className="font-bold">Private pay · to invoice</div><div className="text-xs text-muted">{invoices.filter((r) => r.status === "ready").length} sessions not yet invoiced</div></div>
+          {invoices.map((r) => (
+            <div key={r.id} className="px-4.5 py-3 border-b border-line-soft last:border-0 flex justify-between text-[13px]"><span><b>{r.clients?.first_name} {r.clients?.last_name}</b> · {r.date_of_service} · {r.cpt_code} × {r.units} units</span><Pill tone={r.status === "ready" ? "amber" : "gray"}>{r.status === "ready" ? "to invoice" : r.status}</Pill></div>
+          ))}
+        </Card>
+      )}
+      <div className="text-xs text-muted">v0 exports an 837P-ready CSV for upload to Claim.MD / Office Ally. Direct clearinghouse submission and 835 remittance posting come in v1. Private-pay sessions are listed separately for invoicing; invoice PDFs come in v1.</div>
     </Shell>
   );
 }

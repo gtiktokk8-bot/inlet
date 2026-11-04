@@ -43,6 +43,7 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
       kind, payload, recorded_at: new Date().toISOString(), device_seq: ++seq.current,
     };
     setEvents((prev) => [...prev, e]);           // instant UI
+    if (target) { setFlash(target.id); setTimeout(() => setFlash(null), 450); }
     await appendEvent(e);                          // durable on device
     setPending(await pendingCount());
     sync().then(async () => setPending(await pendingCount())).catch(() => {});
@@ -53,6 +54,8 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
     return record(target, "correction", { corrects: eventId, ...fix });
   }, [record]);
   const [editing, setEditing] = useState<string | null>(null);
+  const [ending, setEnding] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
 
   const ordered = useMemo(() => {
     const ran = new Set(events.map((e) => e.target_id));
@@ -67,6 +70,11 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
   const hh = Math.floor(elapsed / 3600e3), mm = Math.floor((elapsed % 3600e3) / 60e3), ss = Math.floor((elapsed % 60e3) / 1e3);
   const ranCount = new Set(events.filter((e) => e.target_id).map((e) => e.target_id)).size;
 
+  const totals = useMemo(() => {
+    const eff = effective(events);
+    return { trials: eff.filter((e) => e.kind.startsWith("trial_")).length, counts: eff.filter((e) => e.kind === "count").length, taps: events.length };
+  }, [events]);
+
   async function endSession() {
     const ended: Session = { ...session, ended_at: new Date().toISOString(), status: "ended" };
     await saveSessionLocal(ended);
@@ -76,7 +84,7 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
 
   return (
     <div className="min-h-screen bg-ground flex flex-col max-w-[520px] mx-auto">
-      <header className="bg-white border-b border-line px-5 pt-5 pb-3 flex flex-col gap-2.5 sticky top-0 z-10">
+      <header className="bg-card border-b border-line px-5 pt-5 pb-3 flex flex-col gap-2.5 sticky top-0 z-10">
         <div className="flex justify-between items-center">
           <div>
             <div className="text-lg font-bold tracking-tight">{client.first_name} {client.last_name} · {session.place_of_service === "12" ? "Home" : "Clinic"}</div>
@@ -89,6 +97,10 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
           {online ? (
             pending > 0 ? <span className="px-2.5 py-1 rounded-full bg-amber-soft text-amber-ink text-xs font-semibold">Syncing {pending}…</span> : <span className="px-2.5 py-1 rounded-full bg-line-soft text-muted text-xs font-semibold">Synced</span>
           ) : <span className="px-2.5 py-1 rounded-full bg-amber-soft text-amber-ink text-xs font-semibold">Offline · {pending} queued</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="bar grow h-2 rounded-full bg-line-soft overflow-hidden"><span className={`block h-full ${ranCount === targets.length ? "bg-teal" : "bg-gold"}`} style={{ width: `${targets.length ? (ranCount / targets.length) * 100 : 0}%` }} /></div>
+          <span className="text-xs text-muted tabular-nums shrink-0">{ranCount}/{targets.length} targets</span>
         </div>
       </header>
 
@@ -103,14 +115,14 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
           const isOpen = open === t.id;
           const stale = isStale(lastData[t.id] ?? null) && evs.length === 0;
           return (
-            <div key={t.id} className={`bg-white rounded-2xl border ${isOpen ? "border-teal" : "border-line"} overflow-hidden`}>
+            <div key={t.id} className={`bg-card rounded-2xl border ${isOpen ? "border-teal" : "border-line"} overflow-hidden ${flash === t.id ? "landed" : ""}`}>
               <button onClick={() => setOpen(isOpen ? null : t.id)} className="w-full min-h-16 px-3.5 py-3 text-left flex justify-between items-center gap-2.5">
                 <div className="min-w-0">
                   <div className="text-[15px] font-semibold">{t.program_name}</div>
                   <div className="text-xs text-muted">{t.name} · {t.data_type.replace("_", " ")}{stale ? " · no recent data" : ""}</div>
                 </div>
                 <div className="flex items-center gap-2.5 shrink-0">
-                  <div className={`font-bold tabular-nums ${sum.value !== null && t.data_type === "trial" && sum.value >= (t.mastery?.pct ?? 80) ? "text-teal" : evs.length ? "text-ink" : "text-[#9aa3b2]"}`}>{sum.label}</div>
+                  <div className={`font-bold tabular-nums ${sum.value !== null && t.data_type === "trial" && sum.value >= (t.mastery?.pct ?? 80) ? "text-teal-ink" : evs.length ? "text-ink" : "text-[#9aa3b2]"}`}>{sum.label}</div>
                   <span className="text-[#9aa3b2]">›</span>
                 </div>
               </button>
@@ -124,13 +136,13 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
                         {t.sd && <div className="text-xs text-muted">SD: &ldquo;{t.sd}&rdquo; · mastery {t.mastery?.pct ?? 80}% × {t.mastery?.sessions ?? 3}</div>}
                         <div className="grid grid-cols-3 gap-2">
                           <button onClick={() => record(t, "trial_independent")} className="min-h-16 rounded-xl bg-teal text-white font-bold text-[15px]">Independent</button>
-                          <button onClick={() => record(t, "trial_prompted", { prompt_level: prompt })} className="min-h-16 rounded-xl bg-white border border-[#cdd2da] font-semibold text-[15px]">Prompted</button>
-                          <button onClick={() => record(t, "trial_incorrect")} className="min-h-16 rounded-xl bg-white border border-[#cdd2da] font-semibold text-[15px]">Incorrect</button>
+                          <button onClick={() => record(t, "trial_prompted", { prompt_level: prompt })} className="min-h-16 rounded-xl bg-card border border-[#cfcdc6] font-semibold text-[15px]">Prompted</button>
+                          <button onClick={() => record(t, "trial_incorrect")} className="min-h-16 rounded-xl bg-card border border-[#cfcdc6] font-semibold text-[15px]">Incorrect</button>
                         </div>
                         <div className="flex gap-1.5 flex-wrap items-center">
                           <span className="text-xs text-muted">Prompt level:</span>
                           {t.prompt_levels.map((p) => (
-                            <button key={p} onClick={() => setPrompt(p)} className={`min-h-8 px-2.5 rounded-full border text-xs font-semibold ${prompt === p ? "border-teal bg-teal-soft text-teal" : "border-[#cdd2da] bg-white"}`}>{p}</button>
+                            <button key={p} onClick={() => setPrompt(p)} className={`min-h-8 px-2.5 rounded-full border text-xs font-semibold ${prompt === p ? "border-teal bg-teal-soft text-teal-ink" : "border-[#cfcdc6] bg-card"}`}>{p}</button>
                           ))}
                         </div>
                         <div className="flex justify-between text-[13px] text-muted"><span>Trials: <b className="text-ink">{s.n}</b></span><span>I {s.independent} · P {s.prompted} · − {s.incorrect}</span></div>
@@ -141,7 +153,7 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
                   {t.data_type === "frequency" && (
                     <div className="grid grid-cols-[1fr_80px] gap-2">
                       <button onClick={() => record(t, "count")} className="min-h-[72px] rounded-xl bg-teal text-white text-[28px] font-bold">+1</button>
-                      <button onClick={() => { const last = effective(evs).filter((e) => e.kind === "count").at(-1); if (last) correct(t, last.id, { void: true }); }} aria-label="Undo last count" className="min-h-[72px] rounded-xl bg-white border border-[#cdd2da] text-sm font-semibold">Undo</button>
+                      <button onClick={() => { const last = effective(evs).filter((e) => e.kind === "count").at(-1); if (last) correct(t, last.id, { void: true }); }} aria-label="Undo last count" className="min-h-[72px] rounded-xl bg-card border border-[#cfcdc6] text-sm font-semibold">Undo</button>
                     </div>
                   )}
 
@@ -164,8 +176,8 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
                         {(t.steps ?? []).map((label, i) => (
                           <div key={i} className="grid grid-cols-[1fr_44px_44px] gap-1.5 items-center">
                             <div className="text-sm">{label}</div>
-                            <button onClick={() => record(t, "ta_step", { step_index: i, result: ta.latest[i] === 1 ? 0 : 1 })} aria-label="Independent" className={`min-h-11 rounded-[10px] border font-bold ${ta.latest[i] === 1 ? "bg-teal border-teal text-white" : "bg-white border-[#cdd2da]"}`}>I</button>
-                            <button onClick={() => record(t, "ta_step", { step_index: i, result: ta.latest[i] === 2 ? 0 : 2 })} aria-label="Prompted" className={`min-h-11 rounded-[10px] border font-bold ${ta.latest[i] === 2 ? "bg-amber border-amber text-white" : "bg-white border-[#cdd2da]"}`}>P</button>
+                            <button onClick={() => record(t, "ta_step", { step_index: i, result: ta.latest[i] === 1 ? 0 : 1 })} aria-label="Independent" className={`min-h-11 rounded-[10px] border font-bold ${ta.latest[i] === 1 ? "bg-teal border-teal text-white" : "bg-card border-[#cfcdc6]"}`}>I</button>
+                            <button onClick={() => record(t, "ta_step", { step_index: i, result: ta.latest[i] === 2 ? 0 : 2 })} aria-label="Prompted" className={`min-h-11 rounded-[10px] border font-bold ${ta.latest[i] === 2 ? "bg-amber border-amber text-white" : "bg-card border-[#cfcdc6]"}`}>P</button>
                           </div>
                         ))}
                       </div>
@@ -195,7 +207,7 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
                             {isEd && (
                               <div className="px-2.5 pb-2.5 flex gap-1.5 flex-wrap">
                                 {t.data_type === "trial" && (["trial_independent", "trial_prompted", "trial_incorrect"] as EventKind[]).map((k) => (
-                                  <button key={k} disabled={k === e.kind} onClick={() => { correct(t, e.id, { kind: k, payload: k === "trial_prompted" ? { prompt_level: prompt } : {} }); setEditing(null); }} className={`min-h-9 px-3 rounded-full border text-xs font-semibold disabled:opacity-40 ${k === "trial_independent" ? "bg-teal text-white border-teal" : "bg-white border-[#cdd2da]"}`}>
+                                  <button key={k} disabled={k === e.kind} onClick={() => { correct(t, e.id, { kind: k, payload: k === "trial_prompted" ? { prompt_level: prompt } : {} }); setEditing(null); }} className={`min-h-9 px-3 rounded-full border text-xs font-semibold disabled:opacity-40 ${k === "trial_independent" ? "bg-teal text-white border-teal" : "bg-card border-[#cfcdc6]"}`}>
                                     {k === "trial_independent" ? "Independent" : k === "trial_prompted" ? `Prompted (${prompt})` : "Incorrect"}
                                   </button>
                                 ))}
@@ -214,9 +226,27 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
         })}
       </div>
 
-      <footer className="sticky bottom-0 bg-white border-t border-line p-4 pb-7 flex gap-2.5">
-        <button onClick={() => { const text = window.prompt("Quick note (saved to the session, goes into the note draft):"); if (text) record(null, "note", { text }); }} className="min-h-[52px] px-4 rounded-[14px] border border-[#cdd2da] bg-white text-sm font-semibold">Quick note</button>
-        <button onClick={endSession} className="grow min-h-[52px] rounded-[14px] bg-ink text-white text-[15px] font-bold">End session · draft note →</button>
+      {ending && (
+        <div className="fixed inset-0 z-30 bg-black/40 flex items-end justify-center" onClick={() => setEnding(false)}>
+          <div className="w-full max-w-[520px] bg-card rounded-t-3xl p-5 pb-8 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+            <div className="text-lg font-bold">End session?</div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-3 rounded-xl bg-ground"><div className="text-2xl font-bold tabular-nums">{hh * 60 + mm}</div><div className="text-xs text-muted">minutes</div></div>
+              <div className="p-3 rounded-xl bg-ground"><div className="text-2xl font-bold tabular-nums">{totals.trials}</div><div className="text-xs text-muted">trials</div></div>
+              <div className="p-3 rounded-xl bg-ground"><div className="text-2xl font-bold tabular-nums">{ranCount}/{targets.length}</div><div className="text-xs text-muted">targets run</div></div>
+            </div>
+            {ranCount < targets.length && <div className="text-[13px] text-amber-ink">{targets.length - ranCount} target{targets.length - ranCount === 1 ? "" : "s"} not run — fine if that was the plan; it will say so in the note.</div>}
+            {hh * 60 + mm < 8 && <div className="text-[13px] text-red">Under 8 minutes = 0 billable units. The note can be saved but not signed.</div>}
+            <div className="flex gap-2">
+              <button onClick={() => setEnding(false)} className="min-h-12 px-4 rounded-xl border border-[#cfcdc6] bg-card text-sm font-semibold">Keep going</button>
+              <button onClick={endSession} className="grow min-h-12 rounded-xl bg-ink text-white font-bold">End · draft the note →</button>
+            </div>
+          </div>
+        </div>
+      )}
+      <footer className="sticky bottom-0 bg-card border-t border-line p-4 pb-7 flex gap-2.5">
+        <button onClick={() => { const text = window.prompt("Quick note (saved to the session, goes into the note draft):"); if (text) record(null, "note", { text }); }} className="min-h-[52px] px-4 rounded-[14px] border border-[#cfcdc6] bg-card text-sm font-semibold">Quick note</button>
+        <button onClick={() => setEnding(true)} className="grow min-h-[52px] rounded-[14px] bg-ink text-white text-[15px] font-bold">End session →</button>
       </footer>
     </div>
   );

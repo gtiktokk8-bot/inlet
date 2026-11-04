@@ -19,8 +19,8 @@ export function TrendChart({
   const fmt = (t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Trend over sessions" className="w-full h-auto">
-      <line x1={padL} y1={padT} x2={padL} y2={padT + ih} stroke="#cdd2da" />
-      <line x1={padL} y1={padT + ih} x2={W - padR} y2={padT + ih} stroke="#cdd2da" />
+      <line x1={padL} y1={padT} x2={padL} y2={padT + ih} stroke="#cfcdc6" />
+      <line x1={padL} y1={padT + ih} x2={W - padR} y2={padT + ih} stroke="#cfcdc6" />
       {[0, 0.5, 1].map((f) => (
         <text key={f} x={padL - 6} y={Y(f * yMax) + 4} fontSize="11" fill="#5b6472" textAnchor="end">{Math.round(f * yMax)}{unit}</text>
       ))}

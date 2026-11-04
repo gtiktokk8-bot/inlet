@@ -28,11 +28,11 @@ export default async function Today() {
 
       {(open ?? []).length > 0 && (
         <Card className="p-4 border-teal">
-          <div className="text-xs font-semibold text-teal mb-2">IN PROGRESS</div>
+          <div className="text-xs font-semibold text-teal-ink mb-2">IN PROGRESS</div>
           {((open ?? []) as unknown as Sess[]).map((s) => (
             <Link key={s.id} href={`/session/${s.id}`} className="flex justify-between items-center py-2 no-underline text-ink">
               <div><b>{s.clients?.first_name} {s.clients?.last_name}</b> · {s.cpt_code} · started {fmtTime(s.started_at)}</div>
-              <span className="font-semibold text-teal">Resume →</span>
+              <span className="font-semibold text-teal-ink">Resume →</span>
             </Link>
           ))}
         </Card>
@@ -52,7 +52,7 @@ export default async function Today() {
 
       <Card>
         <div className="px-4.5 py-3.5 border-b border-line font-bold">Next 7 days</div>
-        {list.length === 0 && <div className="p-6 text-sm text-muted">Nothing scheduled.</div>}
+        {list.length === 0 && <div className="p-6 text-sm text-muted">Nothing scheduled in the next 7 days. Your BCBA adds appointments from the Schedule page.</div>}
         {list.map((a) => {
           const started = a.sessions?.[0];
           return (
@@ -62,7 +62,7 @@ export default async function Today() {
                 <div className="text-xs text-muted">{a.cpt_code} {CPT_LABEL[a.cpt_code]} · {POS_LABEL[a.place_of_service]}</div>
               </div>
               {started ? (
-                <Link href={started.status === "in_progress" ? `/session/${started.id}` : `/session/${started.id}/note`} className="text-sm font-semibold text-teal no-underline">{started.status === "in_progress" ? "Resume" : "Open note"} →</Link>
+                <Link href={started.status === "in_progress" ? `/session/${started.id}` : `/session/${started.id}/note`} className="text-sm font-semibold text-teal-ink no-underline">{started.status === "in_progress" ? "Resume" : "Open note"} →</Link>
               ) : (
                 <StartSession appointment={{ id: a.id, client_id: a.client_id, cpt_code: a.cpt_code, place_of_service: a.place_of_service }} orgId={profile.org_id} staffId={profile.id} />
               )}
