@@ -12,7 +12,7 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
   const { w } = await searchParams;
   const offset = Number(w ?? 0) || 0;
   const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - ((start.getDay() + 6) % 7) + offset * 7);
-  const end = new Date(start); end.setDate(end.getDate() + 7);
+  const end = new Date(start); end.setDate(end.getDate() + 8); start.setDate(start.getDate() - 1); // ±1 day so any viewer time zone sees its full week
   const [{ data: appts }, auths, { data: staff }, clients] = await Promise.all([
     supabase.from("appointments").select("*, clients(first_name, last_name), profiles(full_name, cert_expires_on), sessions(id, status, notes(status))").neq("status", "cancelled").gte("starts_at", start.toISOString()).lt("starts_at", end.toISOString()).order("starts_at"),
     authUsage(supabase),
@@ -35,7 +35,7 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
   for (const s of staffList) {
     if (s.cert_expires_on) { const d = Math.round((Date.parse(s.cert_expires_on) - Date.now()) / 86400e3); if (d <= 45) warnings.push(`${s.full_name} · ${s.credential} renews in ${d} days — sessions after that date get flagged.`); }
   }
-  const days = [0, 1, 2, 3, 4, 5].map((i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
+  const days = [1, 2, 3, 4, 5, 6].map((i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
   const units = list.reduce((s, a) => s + unitsFromMinutes((Date.parse(a.ends_at) - Date.parse(a.starts_at)) / 60000), 0);
   const label = `${days[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${days[5].toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 
@@ -54,7 +54,7 @@ export default async function Schedule({ searchParams }: { searchParams: Promise
           {warnings.map((w, i) => <div key={i} className="px-3.5 py-3 rounded-xl bg-amber-soft border border-[#f0d9b0] text-[13px]">{w}</div>)}
         </div>
       )}
-      <ScheduleBoard days={days.map((d) => d.toISOString())} appts={board} editable={["owner", "bcba", "bcaba"].includes(profile.role)}
+      <ScheduleBoard offset={offset} appts={board} editable={["owner", "bcba", "bcaba"].includes(profile.role)}
         clients={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}` }))}
         staff={staffList.map((s) => ({ id: s.id, name: s.full_name, role: s.credential ?? s.role }))} />
       <div className="text-xs text-muted flex gap-4 flex-wrap"><Pill tone="teal">Signed / billed</Pill><Pill tone="gray">Scheduled</Pill><Pill tone="amber">Note pending</Pill><span>Click a block to edit or cancel · drag to move · every completed block becomes a claim line once the note is co-signed.</span></div>

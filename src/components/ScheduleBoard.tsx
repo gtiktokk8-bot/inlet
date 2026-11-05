@@ -21,10 +21,13 @@ const POS: Record<string, string> = { "12": "Home", "11": "Clinic", "03": "Schoo
 const minsOf = (iso: string) => { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); };
 const topOf = (iso: string) => ((minsOf(iso) - DAY_START * 60) / 60) * PX_PER_HOUR;
 
-export function ScheduleBoard({ days, appts, clients, staff, editable }: { days: string[]; appts: BoardAppt[]; clients: Opt[]; staff: StaffOpt[]; editable: boolean }) {
+export function ScheduleBoard({ offset, appts, clients, staff, editable }: { offset: number; appts: BoardAppt[]; clients: Opt[]; staff: StaffOpt[]; editable: boolean }) {
+  // Week is computed here, in the viewer's time zone (the server runs in UTC).
+  const days = useMemo(() => { const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - ((start.getDay() + 6) % 7) + offset * 7); return [0, 1, 2, 3, 4, 5].map((i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d.toISOString(); }); }, [offset]);
   const router = useRouter();
   const [items, setItems] = useState(appts);
   useEffect(() => setItems(appts), [appts]);
+  const inWeek = (a: BoardAppt) => { const t = Date.parse(a.starts_at); const s0 = Date.parse(days[0]); return t >= s0 && t < s0 + 7 * 86400e3; };
   const [selected, setSelected] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -114,7 +117,7 @@ export function ScheduleBoard({ days, appts, clients, staff, editable }: { days:
                 <div className="absolute inset-x-0 pointer-events-none" style={{ top: nowTop }}><div className="border-t-2 border-red opacity-60" /></div>
               )}
               {dayList.map((d, col) => {
-                const todays = items.filter((a) => new Date(a.starts_at).toDateString() === d.toDateString());
+                const todays = items.filter((a) => inWeek(a) && new Date(a.starts_at).toDateString() === d.toDateString());
                 const lanes = lanesFor(todays);
                 return todays.map((a) => {
                   const s = a.session; const note = s?.note;

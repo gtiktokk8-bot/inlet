@@ -123,18 +123,17 @@ export async function createAuthorization(form: { client_id: string; cpt_code: s
   revalidatePath("/authorizations"); revalidatePath("/"); revalidatePath(`/clients/${form.client_id}`);
 }
 
-export async function createAppointments(form: { client_id: string; staff_id: string; cpt_code: string; date: string; start: string; end: string; place_of_service: string; repeat_weeks: string }) {
+/** Browser computes the ISO timestamps (its own time zone), one pair per weekly occurrence. */
+export async function createAppointments(form: { client_id: string; staff_id: string; cpt_code: string; place_of_service: string; slots: { starts_at: string; ends_at: string }[] }) {
   const sb = await createClient();
   const { org_id } = await orgOf(sb);
-  const weeks = Math.max(1, Math.min(26, Number(form.repeat_weeks) || 1));
-  const rows = [];
-  for (let w = 0; w < weeks; w++) {
-    const d = new Date(`${form.date}T00:00:00`); d.setDate(d.getDate() + w * 7);
-    const day = d.toISOString().slice(0, 10);
-    const starts = new Date(`${day}T${form.start}:00`), ends = new Date(`${day}T${form.end}:00`);
+  if (!form.slots.length || form.slots.length > 26) throw new Error("1–26 occurrences");
+  const rows = form.slots.map((t) => {
+    const starts = Date.parse(t.starts_at), ends = Date.parse(t.ends_at);
+    if (!(starts > 0 && ends > 0)) throw new Error("invalid date or time");
     if (ends <= starts) throw new Error("end must be after start");
-    rows.push({ org_id, client_id: form.client_id, staff_id: form.staff_id, cpt_code: form.cpt_code, starts_at: starts.toISOString(), ends_at: ends.toISOString(), place_of_service: form.place_of_service });
-  }
+    return { org_id, client_id: form.client_id, staff_id: form.staff_id, cpt_code: form.cpt_code, starts_at: new Date(starts).toISOString(), ends_at: new Date(ends).toISOString(), place_of_service: form.place_of_service };
+  });
   const { error } = await sb.from("appointments").insert(rows);
   if (error) throw new Error(error.message);
   revalidatePath("/schedule"); revalidatePath("/today");
@@ -168,14 +167,14 @@ export async function updateStaff(id: string, form: { credential: string; npi: s
 }
 
 /** Edit a scheduled appointment (not one that already has a session started). */
-export async function updateAppointment(id: string, form: { client_id: string; staff_id: string; cpt_code: string; date: string; start: string; end: string; place_of_service: string }) {
+export async function updateAppointment(id: string, form: { client_id: string; staff_id: string; cpt_code: string; place_of_service: string; starts_at: string; ends_at: string }) {
   const sb = await createClient();
   const { data: s } = await sb.from("sessions").select("id").eq("appointment_id", id).maybeSingle();
   if (s) throw new Error("this appointment already has a session — fix times from the note instead");
-  const starts = new Date(`${form.date}T${form.start}:00`), ends = new Date(`${form.date}T${form.end}:00`);
-  if (!(starts.getTime() > 0 && ends.getTime() > 0)) throw new Error("invalid date or time");
+  const starts = Date.parse(form.starts_at), ends = Date.parse(form.ends_at);
+  if (!(starts > 0 && ends > 0)) throw new Error("invalid date or time");
   if (ends <= starts) throw new Error("end must be after start");
-  const { error } = await sb.from("appointments").update({ client_id: form.client_id, staff_id: form.staff_id, cpt_code: form.cpt_code, starts_at: starts.toISOString(), ends_at: ends.toISOString(), place_of_service: form.place_of_service }).eq("id", id);
+  const { error } = await sb.from("appointments").update({ client_id: form.client_id, staff_id: form.staff_id, cpt_code: form.cpt_code, starts_at: new Date(starts).toISOString(), ends_at: new Date(ends).toISOString(), place_of_service: form.place_of_service }).eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/schedule"); revalidatePath("/today");
 }

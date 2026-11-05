@@ -40,7 +40,16 @@ export function NewAppointmentForm({ clients, staff, onDone, initial, appointmen
       <Btn disabled={busy || !f.client_id || !f.staff_id} onClick={async () => {
         setBusy(true); setErr(null);
         try {
-          if (editing) { await updateAppointment(appointmentId!, f); setSaved(true); } else { await createAppointments(f); }
+          const slots = [] as { starts_at: string; ends_at: string }[];
+          const weeks = editing ? 1 : Math.max(1, Math.min(26, Number(f.repeat_weeks) || 1));
+          for (let w = 0; w < weeks; w++) {
+            const st = new Date(`${f.date}T${f.start}:00`); st.setDate(st.getDate() + w * 7);   // local time, in the user's zone
+            const en = new Date(`${f.date}T${f.end}:00`); en.setDate(en.getDate() + w * 7);
+            if (isNaN(st.getTime()) || isNaN(en.getTime())) throw new Error("pick a date and times");
+            slots.push({ starts_at: st.toISOString(), ends_at: en.toISOString() });
+          }
+          if (editing) { await updateAppointment(appointmentId!, { client_id: f.client_id, staff_id: f.staff_id, cpt_code: f.cpt_code, place_of_service: f.place_of_service, ...slots[0] }); setSaved(true); }
+          else { await createAppointments({ client_id: f.client_id, staff_id: f.staff_id, cpt_code: f.cpt_code, place_of_service: f.place_of_service, slots }); }
           router.refresh(); onDone?.();
         } catch (e) { setErr((e as Error).message); }
         setBusy(false);
