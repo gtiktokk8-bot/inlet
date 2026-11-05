@@ -27,6 +27,8 @@ export function ScheduleBoard({ offset, appts, clients, staff, editable }: { off
   const router = useRouter();
   const [items, setItems] = useState(appts);
   useEffect(() => setItems(appts), [appts]);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const inWeek = (a: BoardAppt) => { const t = Date.parse(a.starts_at); const s0 = Date.parse(days[0]); return t >= s0 && t < s0 + 7 * 86400e3; };
   const [selected, setSelected] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -93,6 +95,7 @@ export function ScheduleBoard({ offset, appts, clients, staff, editable }: { off
   const nowTop = (() => { const n = new Date(); const m = n.getHours() * 60 + n.getMinutes(); return m >= DAY_START * 60 && m <= DAY_END * 60 ? ((m - DAY_START * 60) / 60) * PX_PER_HOUR : null; })();
   const todayStr = new Date().toDateString();
 
+  if (!mounted) return <div className="grid grid-cols-1 xl:grid-cols-4 gap-4"><Card className="xl:col-span-3 min-h-[60vh] animate-pulse">{null}</Card><Card className="h-64 animate-pulse">{null}</Card></div>;
   return (
     <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
       <Card className="xl:col-span-3 overflow-hidden">

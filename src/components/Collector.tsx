@@ -88,7 +88,7 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
         <div className="flex justify-between items-center">
           <div>
             <div className="text-lg font-bold tracking-tight">{client.first_name} {client.last_name} · {session.place_of_service === "12" ? "Home" : "Clinic"}</div>
-            <div className="text-[13px] text-muted">{session.cpt_code} · started {new Date(session.started_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</div>
+            <div className="text-[13px] text-muted" suppressHydrationWarning>{session.cpt_code} · started {new Date(session.started_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</div>
           </div>
           <div className="text-[26px] font-semibold tabular-nums tracking-tight">{hh}:{String(mm).padStart(2, "0")}:{String(ss).padStart(2, "0")}</div>
         </div>
@@ -202,7 +202,7 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
                           <div key={e.id} aria-selected={isEd} className={`rounded-[10px] border ${isEd ? "border-teal" : "border-line-soft"} bg-ground`}>
                             <button onClick={() => setEditing(isEd ? null : e.id)} className="w-full min-h-11 px-3 flex justify-between items-center text-[13px]">
                               <span><span className="text-muted tabular-nums mr-2">#{n}</span><b>{label}</b>{corrected && <span className="ml-2 text-[11px] text-amber-ink font-semibold">edited</span>}</span>
-                              <span className="text-muted text-xs">{time}</span>
+                              <span className="text-muted text-xs" suppressHydrationWarning>{time}</span>
                             </button>
                             {isEd && (
                               <div className="px-2.5 pb-2.5 flex gap-1.5 flex-wrap">

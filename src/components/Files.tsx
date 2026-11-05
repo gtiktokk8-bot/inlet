@@ -54,7 +54,7 @@ export function Files({ ownerKind, ownerId, orgId, files, canDelete }: { ownerKi
               className="flex items-center justify-between gap-3 px-3 py-2.5 border border-transparent border-b-line-soft last:border-b-transparent rounded-lg pressable cursor-pointer">
               <div className="min-w-0">
                 <div className="font-medium text-sm truncate">{f.name}</div>
-                <div className="text-xs text-muted">{label(f.category)} · {fmtSize(f.size)} · {fmtDate(f.created_at)}</div>
+                <div className="text-xs text-muted" suppressHydrationWarning>{label(f.category)} · {fmtSize(f.size)} · {fmtDate(f.created_at)}</div>
               </div>
               <div className="flex gap-2 shrink-0">
                 <button disabled={busy !== null} onClick={async (e) => { e.stopPropagation(); setBusy(f.id); try { const u = await fileUrl(f.id); window.open(u, "_blank"); } catch (er) { setErr((er as Error).message); } setBusy(null); }} className="min-h-9 px-3 rounded-[10px] border border-[#cfcdc6] bg-card text-xs font-semibold">{busy === f.id ? "…" : "Open"}</button>

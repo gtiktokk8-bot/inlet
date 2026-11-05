@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { SessionFacts } from "@/lib/note-draft";
 import { checklist as runChecklist, templateDraft } from "@/lib/note-draft";
@@ -48,6 +48,7 @@ export function NoteEditor({ sessionId, facts, client, existing, previous, quick
   const [editTimes, setEditTimes] = useState(false);
   const [tStart, setTStart] = useState(toLocalInput(facts.startedAt));
   const [tEnd, setTEnd] = useState(toLocalInput(facts.endedAt));
+  useEffect(() => { setTStart(toLocalInput(facts.startedAt)); setTEnd(toLocalInput(facts.endedAt)); }, [facts.startedAt, facts.endedAt]); // re-derive in the browser's zone after hydration
   const locked = existing?.status === "signed" || existing?.status === "cosigned";
   const factsNow = useMemo(() => ({ ...facts, caregiverPresent: caregiver }), [facts, caregiver]);
   const checks = useMemo(() => runChecklist(factsNow, body), [factsNow, body]);
@@ -88,7 +89,7 @@ export function NoteEditor({ sessionId, facts, client, existing, previous, quick
           <div className="w-12" />
         </div>
         <div className="flex justify-between items-center text-[13px] text-muted gap-2">
-          <span className="truncate">{client.name} · {facts.cpt} · {fmt(facts.startedAt)}–{fmt(facts.endedAt)}</span>
+          <span className="truncate" suppressHydrationWarning>{client.name} · {facts.cpt} · {fmt(facts.startedAt)}–{fmt(facts.endedAt)}</span>
           <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${locked ? "bg-teal-soft text-teal-ink" : existing?.status === "returned" ? "bg-red-soft text-red" : dueText.startsWith("overdue") ? "bg-red-soft text-red" : "bg-gold-soft text-gold-ink"}`}>
             {locked ? existing?.status : existing?.status === "returned" ? "returned" : `due · ${dueText}`}
           </span>
@@ -114,7 +115,7 @@ export function NoteEditor({ sessionId, facts, client, existing, previous, quick
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2 text-[13px]">
-              <div><div className="text-muted">Time in / out</div><div className="font-semibold">{fmt(facts.startedAt)} – {fmt(facts.endedAt)} · {facts.minutes} min</div></div>
+              <div><div className="text-muted">Time in / out</div><div className="font-semibold" suppressHydrationWarning>{fmt(facts.startedAt)} – {fmt(facts.endedAt)} · {facts.minutes} min</div></div>
               <div><div className="text-muted">Place of service</div><div className="font-semibold">{facts.pos}</div></div>
               <div><div className="text-muted">Rendering provider</div><div className="font-semibold">{facts.staffName}, {facts.staffCredential}</div></div>
               <div>
