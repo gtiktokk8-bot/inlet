@@ -98,7 +98,6 @@ export function templateDraft(f: SessionFacts): string {
     else lines.push(`${t.program} was practiced using the task analysis: ${t.summary}.`);
   }
   if (skipped.length) lines.push(`Not run this session: ${skipped.map((t) => t.program).join(", ")}.`);
-  lines.push("[RESPONSE TO TREATMENT — describe how the client responded today and any protocol changes recommended to the BCBA.]");
   lines.push("Client continues to require services to address skill deficits and behaviors identified in the treatment plan; continue current protocols.");
   return lines.join(" ");
 }
@@ -108,9 +107,31 @@ export function checklist(f: SessionFacts, body: string) {
   const ran = f.targets.filter((t) => t.summary !== "not run this session");
   return {
     time_units: f.minutes >= 8 && f.units > 0,
-    pos_caregiver: !!f.pos && f.caregiverPresent !== null,
+    pos_caregiver: !!f.pos && f.caregiverPresent !== null && splitNote(body).caregiver.trim().length > 0,
     targets: ran.filter((t) => t.dataType === "trial" || t.dataType === "task_analysis").every((t) => body.includes(t.program)),
     behavior: ran.filter((t) => t.dataType === "frequency" || t.dataType === "duration").every((t) => body.includes(t.program)),
-    response: !body.includes("[RESPONSE TO TREATMENT") && /respond|response|progress|continue/i.test(body),
+    response: splitNote(body).response.trim().length >= 20,
   };
 }
+
+/* ---- Structured note sections, stored in one `body` text so signed notes stay immutable text. ---- */
+export const NOTE_H = { caregiver: "CAREGIVER UPDATE", session: "SESSION", response: "RESPONSE TO TREATMENT" } as const;
+export type NoteSections = { caregiver: string; session: string; response: string };
+
+export function splitNote(body: string): NoteSections {
+  const out: NoteSections = { caregiver: "", session: "", response: "" };
+  if (!body) return out;
+  const re = /^(CAREGIVER UPDATE|SESSION|RESPONSE TO TREATMENT)\s*$/m;
+  if (!re.test(body)) { out.session = body; return out; }               // legacy single-paragraph notes
+  const parts = body.split(/^(CAREGIVER UPDATE|SESSION|RESPONSE TO TREATMENT)\s*$/m);
+  for (let i = 1; i < parts.length; i += 2) {
+    const k = parts[i] === NOTE_H.caregiver ? "caregiver" : parts[i] === NOTE_H.session ? "session" : "response";
+    out[k] = (parts[i + 1] ?? "").trim();
+  }
+  return out;
+}
+export function joinNote(s: NoteSections): string {
+  return `${NOTE_H.caregiver}\n${s.caregiver.trim()}\n\n${NOTE_H.session}\n${s.session.trim()}\n\n${NOTE_H.response}\n${s.response.trim()}`;
+}
+/** Strip any bracketed placeholder a drafter might leave in the session narrative. */
+export function stripPlaceholders(t: string) { return t.replace(/\s*\[RESPONSE TO TREATMENT[^\]]*\]/g, "").replace(/\s{2,}/g, " ").trim(); }

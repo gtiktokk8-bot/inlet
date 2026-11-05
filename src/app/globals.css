@@ -40,3 +40,27 @@ button:active:not(:disabled) { transform: translateY(1px); }
 /* checklist item flipping green */
 @keyframes pop { 0% { transform: scale(.8);} 60% { transform: scale(1.12);} 100% { transform: scale(1);} }
 .pop { animation: pop 260ms ease-out; }
+
+/* ---- Selection & focus: anything selected, pressed, current or focused is visibly highlighted ---- */
+:focus-visible { outline: 2px solid var(--color-teal); outline-offset: 2px; border-radius: 6px; }
+button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+
+/* selected things: teal ring + tint. Used by calendar blocks, targets, rows, chips. */
+.is-selected, [aria-selected="true"], [aria-pressed="true"], [aria-current="page"], [aria-current="true"] {
+  box-shadow: 0 0 0 2px var(--color-teal), 0 0 0 5px rgba(11,122,98,.18);
+  background-color: var(--color-teal-soft) !important;
+  border-color: var(--color-teal) !important;
+}
+[aria-selected="true"], .is-selected { transition: box-shadow 120ms ease-out, background-color 120ms ease-out; }
+
+/* pressable rows and cards tint on hover/press so the click target is obvious */
+.pressable { transition: background-color 120ms ease-out, border-color 120ms ease-out, transform 80ms ease-out; }
+.pressable:hover { background-color: var(--color-ground); border-color: #cfcdc6; }
+.pressable:active { background-color: var(--color-teal-soft); border-color: var(--color-teal); transform: translateY(1px); }
+
+/* table rows that link somewhere */
+tr.pressable:hover > td { background-color: var(--color-ground); }
+tr.pressable:active > td { background-color: var(--color-teal-soft); }
+
+/* buttons: press tint */
+button:not(:disabled):active { filter: brightness(.96); }

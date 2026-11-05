@@ -166,3 +166,71 @@ export async function updateStaff(id: string, form: { credential: string; npi: s
   if (error) throw new Error(error.message);
   revalidatePath("/team");
 }
+
+/** Edit a scheduled appointment (not one that already has a session started). */
+export async function updateAppointment(id: string, form: { client_id: string; staff_id: string; cpt_code: string; date: string; start: string; end: string; place_of_service: string }) {
+  const sb = await createClient();
+  const { data: s } = await sb.from("sessions").select("id").eq("appointment_id", id).maybeSingle();
+  if (s) throw new Error("this appointment already has a session — fix times from the note instead");
+  const starts = new Date(`${form.date}T${form.start}:00`), ends = new Date(`${form.date}T${form.end}:00`);
+  if (!(starts.getTime() > 0 && ends.getTime() > 0)) throw new Error("invalid date or time");
+  if (ends <= starts) throw new Error("end must be after start");
+  const { error } = await sb.from("appointments").update({ client_id: form.client_id, staff_id: form.staff_id, cpt_code: form.cpt_code, starts_at: starts.toISOString(), ends_at: ends.toISOString(), place_of_service: form.place_of_service }).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/schedule"); revalidatePath("/today");
+}
+
+/** Drag-and-drop: move an appointment to a new start, keeping its duration. */
+export async function moveAppointment(id: string, newStartIso: string) {
+  const sb = await createClient();
+  const { data: a, error: e0 } = await sb.from("appointments").select("starts_at, ends_at").eq("id", id).single();
+  if (e0 || !a) throw new Error(e0?.message ?? "appointment not found");
+  const { data: s } = await sb.from("sessions").select("id").eq("appointment_id", id).maybeSingle();
+  if (s) throw new Error("this appointment already has a session and can't be moved");
+  const dur = Date.parse(a.ends_at) - Date.parse(a.starts_at);
+  const start = Date.parse(newStartIso);
+  if (!(start > 0)) throw new Error("invalid time");
+  const { error } = await sb.from("appointments").update({ starts_at: new Date(start).toISOString(), ends_at: new Date(start + dur).toISOString() }).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/schedule"); revalidatePath("/today");
+}
+
+/* ---------------- Files (client & staff profiles) ---------------- */
+export async function registerFile(form: { owner_kind: "client" | "staff"; owner_id: string; name: string; path: string; size: number; mime: string; category: string }) {
+  const sb = await createClient();
+  const { user, org_id } = await orgOf(sb);
+  if (!form.path.startsWith(`${org_id}/`)) throw new Error("bad path");
+  const { error } = await sb.from("files").insert({ org_id, owner_kind: form.owner_kind, owner_id: form.owner_id, name: form.name, path: form.path, size: form.size, mime: form.mime || null, category: form.category || "other", uploaded_by: user.id });
+  if (error) throw new Error(error.message);
+}
+export async function fileUrl(id: string) {
+  const sb = await createClient();
+  const { data: f } = await sb.from("files").select("path").eq("id", id).single();
+  if (!f) throw new Error("file not found");
+  const { data, error } = await sb.storage.from("files").createSignedUrl(f.path, 300);
+  if (error || !data) throw new Error(error?.message ?? "could not sign url");
+  return data.signedUrl;
+}
+export async function deleteFile(id: string) {
+  const sb = await createClient();
+  const { data: f } = await sb.from("files").select("path").eq("id", id).single();
+  if (!f) throw new Error("file not found");
+  const { error } = await sb.from("files").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  await sb.storage.from("files").remove([f.path]);
+}
+
+/* ---------------- My profile ---------------- */
+export async function updateMyProfile(form: { full_name: string; credential: string; npi: string; cert_expires_on: string }) {
+  const sb = await createClient();
+  const { user } = await orgOf(sb);
+  const { error } = await sb.from("profiles").update({ full_name: form.full_name.trim(), credential: form.credential || null, npi: form.npi || null, cert_expires_on: form.cert_expires_on || null }).eq("id", user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/profile"); revalidatePath("/team"); revalidatePath("/");
+}
+export async function changePassword(password: string) {
+  if (password.length < 10) throw new Error("use at least 10 characters");
+  const sb = await createClient();
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) throw new Error(error.message);
+}

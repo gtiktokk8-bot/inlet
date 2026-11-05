@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { SessionFacts } from "@/lib/note-draft";
 import { checklist as runChecklist, templateDraft } from "@/lib/note-draft";
 import { saveNote, signNote, cosignNote, returnNote, updateSessionTimes } from "@/app/actions";
+import { splitNote, joinNote, stripPlaceholders } from "@/lib/note-draft";
 import { useRouter } from "next/navigation";
 import { hoursLeft } from "./ui";
 
@@ -18,10 +19,10 @@ function reasons(f: SessionFacts, c: Checks): Record<keyof Checks, { label: stri
       label: `Billable time: ${f.minutes} min = ${f.units} unit${f.units === 1 ? "" : "s"}`,
       why: c.time_units ? "15-minute units, 8-minute minimum." : f.minutes < 8 ? "Under the 8-minute minimum — 0 units. If the timer is wrong, fix the times above." : "Units could not be computed.",
     },
-    pos_caregiver: { label: "Place of service and caregiver presence", why: c.pos_caregiver ? `${f.pos} · caregiver ${f.caregiverPresent ? "present" : "not present"}` : "Pick Yes or No for caregiver present." },
+    pos_caregiver: { label: "Caregiver presence + caregiver update", why: c.pos_caregiver ? `${f.pos} · caregiver ${f.caregiverPresent ? "present" : "not present"} · update noted` : f.caregiverPresent === null ? "Pick Yes or No for caregiver present." : "Fill in the caregiver update at the top (or tap “None reported”)." },
     targets: { label: `Skill targets named with data (${skills.length})`, why: c.targets ? skills.map((t) => t.program).join(", ") || "none run" : "Every skill program run today must appear in the narrative by name." },
     behavior: { label: `Behavior targets with intervention (${behaviors.length})`, why: c.behavior ? behaviors.map((t) => t.program).join(", ") || "none run" : "Every behavior program with data must appear by name, with what was done." },
-    response: { label: "Response to treatment / medical necessity", why: c.response ? "Stated." : "Replace the [RESPONSE TO TREATMENT] placeholder with how the client responded today." },
+    response: { label: "Response to treatment", why: c.response ? "Stated." : "Write how the client responded to treatment today in the Response to treatment box." },
   };
 }
 
@@ -37,7 +38,9 @@ export function NoteEditor({ sessionId, facts, client, existing, previous, quick
   previous: string | null; quickNotes: string[]; canEdit: boolean; isBcba: boolean; noteId: string | null;
 }) {
   const router = useRouter();
-  const [body, setBody] = useState(existing?.body ?? "");
+  const [sec, setSec] = useState(() => splitNote(existing?.body ?? ""));
+  const setPart = (k: "caregiver" | "session" | "response", v: string) => setSec((x) => ({ ...x, [k]: v }));
+  const body = useMemo(() => (sec.caregiver || sec.session || sec.response ? joinNote(sec) : ""), [sec]);
   const [caregiver, setCaregiver] = useState<boolean | null>(facts.caregiverPresent);
   const [busy, setBusy] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
@@ -51,7 +54,7 @@ export function NoteEditor({ sessionId, facts, client, existing, previous, quick
   const why = useMemo(() => reasons(factsNow, checks), [factsNow, checks]);
   const passCount = Object.values(checks).filter(Boolean).length;
   const allPass = passCount === 5;
-  const words = body.trim() ? body.trim().split(/\s+/).length : 0;
+  const words = sec.session.trim() ? sec.session.trim().split(/\s+/).length : 0;
   const due = new Date(Date.parse(facts.endedAt) + 48 * 3600e3).toISOString();
   const dueText = hoursLeft(due);
 
@@ -60,10 +63,10 @@ export function NoteEditor({ sessionId, facts, client, existing, previous, quick
     try {
       const r = await fetch("/api/note/draft", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ facts: factsNow, previous: withPrevious ? previous : undefined }) });
       const j = await r.json();
-      let text: string = j.body;
+      let text: string = stripPlaceholders(j.body);
       if (quickNotes.length) text += ` Technician notes: ${quickNotes.join("; ")}.`;
-      setBody(text); setSource(j.source);
-    } catch (e) { setBody(templateDraft(factsNow)); setSource("template"); void e; }
+      setPart("session", text); setSource(j.source);
+    } catch (e) { setPart("session", stripPlaceholders(templateDraft(factsNow))); setSource("template"); void e; }
     setBusy(null);
   }
 
@@ -131,20 +134,37 @@ export function NoteEditor({ sessionId, facts, client, existing, previous, quick
           </div>
         </section>
 
+        <section className="bg-card border border-line rounded-2xl p-3.5 flex flex-col gap-2">
+          <div className="flex justify-between items-center">
+            <div className="text-xs font-semibold text-muted uppercase tracking-wider">1 · Caregiver update</div>
+            {!locked && canEdit && !sec.caregiver && <button onClick={() => setPart("caregiver", "None reported.")} className="text-xs font-semibold text-teal-ink">None reported</button>}
+          </div>
+          <textarea value={sec.caregiver} onChange={(e) => setPart("caregiver", e.target.value)} readOnly={locked || !canEdit} rows={3}
+            className="w-full p-3 border border-line rounded-xl text-sm leading-relaxed bg-card read-only:bg-ground"
+            placeholder="Anything the caregiver reported from today or the day before — sleep, illness, medication changes, events at home or school, behaviors they saw." />
+        </section>
+
         <section className="bg-card border border-line rounded-2xl p-3.5 flex flex-col gap-2.5">
           <div className="flex justify-between items-center">
-            <div className="text-xs font-semibold text-muted uppercase tracking-wider">Narrative</div>
+            <div className="text-xs font-semibold text-muted uppercase tracking-wider">2 · Session</div>
             <div className={`text-xs ${words && words < 120 ? "text-amber-ink" : "text-muted"}`}>{words} words{source ? ` · ${source === "model" ? "AI draft" : "drafted from data"}` : ""}</div>
           </div>
           {!locked && canEdit && (
             <div className="grid grid-cols-2 gap-2">
               <button disabled={!previous || busy !== null} onClick={() => draft(true)} className="min-h-12 rounded-xl border border-[#cfcdc6] bg-card text-[13px] font-semibold disabled:opacity-50">{previous ? "Last note's style + today's data" : "No previous note yet"}</button>
-              <button disabled={busy !== null} onClick={() => draft(false)} className="min-h-12 rounded-xl bg-teal text-white text-[13px] font-bold disabled:opacity-50">{busy === "draft" ? "Drafting…" : body ? "Redraft from today's data" : "Draft from today's data"}</button>
+              <button disabled={busy !== null} onClick={() => draft(false)} className="min-h-12 rounded-xl bg-teal text-white text-[13px] font-bold disabled:opacity-50">{busy === "draft" ? "Drafting…" : sec.session ? "Redraft from today's data" : "Draft from today's data"}</button>
             </div>
           )}
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} readOnly={locked || !canEdit} rows={10}
+          <textarea value={sec.session} onChange={(e) => setPart("session", e.target.value)} readOnly={locked || !canEdit} rows={9}
             className="w-full p-3 border border-line rounded-xl text-sm leading-relaxed bg-card read-only:bg-ground"
             placeholder="Draft from today's data, then edit anything in place. The draft only uses what was collected — it never invents what happened." />
+        </section>
+
+        <section className="bg-card border border-line rounded-2xl p-3.5 flex flex-col gap-2">
+          <div className="text-xs font-semibold text-muted uppercase tracking-wider">3 · Response to treatment</div>
+          <textarea value={sec.response} onChange={(e) => setPart("response", e.target.value)} readOnly={locked || !canEdit} rows={4}
+            className="w-full p-3 border border-line rounded-xl text-sm leading-relaxed bg-card read-only:bg-ground"
+            placeholder="How did the client respond to treatment today? Engagement, progress or regression vs. recent sessions, what helped, and any protocol changes to recommend to the BCBA." />
         </section>
 
         <section className="bg-card border border-line rounded-2xl p-3.5 flex flex-col gap-2.5">

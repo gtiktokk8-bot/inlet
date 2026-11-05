@@ -30,7 +30,7 @@ export default async function Today() {
         <Card className="p-4 border-teal">
           <div className="text-xs font-semibold text-teal-ink mb-2">IN PROGRESS</div>
           {((open ?? []) as unknown as Sess[]).map((s) => (
-            <Link key={s.id} href={`/session/${s.id}`} className="flex justify-between items-center py-2 no-underline text-ink">
+            <Link key={s.id} href={`/session/${s.id}`} className="flex justify-between items-center py-2 px-2 -mx-2 rounded-lg no-underline text-ink pressable">
               <div><b>{s.clients?.first_name} {s.clients?.last_name}</b> · {s.cpt_code} · started {fmtTime(s.started_at)}</div>
               <span className="font-semibold text-teal-ink">Resume →</span>
             </Link>
@@ -42,7 +42,7 @@ export default async function Today() {
         <Card className="p-4">
           <div className="text-xs font-semibold text-amber-ink mb-2">NOTES TO FINISH</div>
           {needNote.map((s) => (
-            <Link key={s.id} href={`/session/${s.id}/note`} className="flex justify-between items-center py-2 border-b border-line-soft last:border-0 no-underline text-ink">
+            <Link key={s.id} href={`/session/${s.id}/note`} className="flex justify-between items-center py-2 px-2 -mx-2 rounded-lg border-b border-line-soft last:border-0 no-underline text-ink pressable">
               <div><b>{s.clients?.first_name} {s.clients?.last_name}</b> · {s.cpt_code} · {fmtDate(s.started_at)} {fmtTime(s.started_at)}</div>
               <Pill tone="amber">{noteOf(s)?.status === "returned" ? "Returned by BCBA" : "Draft"}</Pill>
             </Link>

@@ -115,7 +115,7 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
           const isOpen = open === t.id;
           const stale = isStale(lastData[t.id] ?? null) && evs.length === 0;
           return (
-            <div key={t.id} className={`bg-card rounded-2xl border ${isOpen ? "border-teal" : "border-line"} overflow-hidden ${flash === t.id ? "landed" : ""}`}>
+            <div key={t.id} aria-selected={isOpen} className={`bg-card rounded-2xl border ${isOpen ? "border-teal" : "border-line"} overflow-hidden ${flash === t.id ? "landed" : ""}`}>
               <button onClick={() => setOpen(isOpen ? null : t.id)} className="w-full min-h-16 px-3.5 py-3 text-left flex justify-between items-center gap-2.5">
                 <div className="min-w-0">
                   <div className="text-[15px] font-semibold">{t.program_name}</div>
@@ -142,7 +142,7 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
                         <div className="flex gap-1.5 flex-wrap items-center">
                           <span className="text-xs text-muted">Prompt level:</span>
                           {t.prompt_levels.map((p) => (
-                            <button key={p} onClick={() => setPrompt(p)} className={`min-h-8 px-2.5 rounded-full border text-xs font-semibold ${prompt === p ? "border-teal bg-teal-soft text-teal-ink" : "border-[#cfcdc6] bg-card"}`}>{p}</button>
+                            <button key={p} onClick={() => setPrompt(p)} aria-pressed={prompt === p} className={`min-h-8 px-2.5 rounded-full border text-xs font-semibold ${prompt === p ? "border-teal bg-teal-soft text-teal-ink" : "border-[#cfcdc6] bg-card"}`}>{p}</button>
                           ))}
                         </div>
                         <div className="flex justify-between text-[13px] text-muted"><span>Trials: <b className="text-ink">{s.n}</b></span><span>I {s.independent} · P {s.prompted} · − {s.incorrect}</span></div>
@@ -199,7 +199,7 @@ export function Collector({ session, client, targets, initialEvents, lastData }:
                         const isEd = editing === e.id;
                         void arr;
                         return (
-                          <div key={e.id} className={`rounded-[10px] border ${isEd ? "border-teal" : "border-line-soft"} bg-ground`}>
+                          <div key={e.id} aria-selected={isEd} className={`rounded-[10px] border ${isEd ? "border-teal" : "border-line-soft"} bg-ground`}>
                             <button onClick={() => setEditing(isEd ? null : e.id)} className="w-full min-h-11 px-3 flex justify-between items-center text-[13px]">
                               <span><span className="text-muted tabular-nums mr-2">#{n}</span><b>{label}</b>{corrected && <span className="ml-2 text-[11px] text-amber-ink font-semibold">edited</span>}</span>
                               <span className="text-muted text-xs">{time}</span>

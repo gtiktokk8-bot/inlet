@@ -15,7 +15,7 @@ export default async function Clients() {
       <Card>
         {clients.length === 0 && <Empty title="No clients yet" body="Add your first client — it takes about a minute." action={<Btn href="/clients/new">New client</Btn>} />}
         {clients.map((c) => (
-          <Link key={c.id} href={`/clients/${c.id}`} className="flex justify-between items-center px-4.5 py-3.5 border-b border-line-soft last:border-0 no-underline text-ink">
+          <Link key={c.id} href={`/clients/${c.id}`} className="flex justify-between items-center px-4.5 py-3.5 border-b border-line-soft last:border-0 no-underline text-ink pressable">
             <div>
               <div className="font-semibold">{c.first_name} {c.last_name}</div>
               <div className="text-xs text-muted">DOB {c.dob} · {c.diagnosis_code ?? "—"} · {c.payers?.name ?? "no payer"}</div>

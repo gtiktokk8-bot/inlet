@@ -85,7 +85,7 @@ export default async function Caseload() {
         ) : (
           <div className="flex flex-col gap-2">
             {three.map((a, i) => (
-              <Link key={i} href={a.href} className="flex items-center gap-3 p-3 rounded-xl border border-line hover:border-teal no-underline text-ink">
+              <Link key={i} href={a.href} className="flex items-center gap-3 p-3 rounded-xl border border-line no-underline text-ink pressable">
                 <span className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-sm font-bold ${a.tone === "red" ? "bg-red-soft text-red" : a.tone === "amber" ? "bg-gold-soft text-gold-ink" : "bg-teal-soft text-teal-ink"}`}>{i + 1}</span>
                 <div className="min-w-0 grow">
                   <div className="font-semibold text-sm">{a.title}</div>
@@ -133,7 +133,7 @@ export default async function Caseload() {
                   })
                   .sort((x, y) => y.score - x.score)
                   .map(({ c, a, stale }) => (
-                    <tr key={c.id} className="border-b border-line-soft last:border-0">
+                    <tr key={c.id} className="border-b border-line-soft last:border-0 pressable">
                       <td className="px-4.5 py-3">
                         <Link href={`/clients/${c.id}`} className="font-semibold no-underline text-ink">{c.first_name} {c.last_name}</Link>
                         <div className="text-xs text-muted">Lead: {c.lead?.full_name ?? "—"}</div>

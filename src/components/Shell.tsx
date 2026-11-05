@@ -4,7 +4,7 @@ import { SignOutButton } from "./SignOutButton";
 import { Logo } from "./Logo";
 
 const nav = [
-  { href: "/", label: "Caseload", short: "Caseload", roles: ["owner", "bcba", "bcaba", "biller"] },
+  { href: "/", label: "Home", short: "Home", roles: ["owner", "bcba", "bcaba", "biller"] },
   { href: "/today", label: "My day", short: "My day", roles: ["rbt", "bcba", "bcaba", "owner"] },
   { href: "/clients", label: "Clients", short: "Clients", roles: ["owner", "bcba", "bcaba", "rbt", "biller"] },
   { href: "/schedule", label: "Schedule", short: "Schedule", roles: ["owner", "bcba", "bcaba", "rbt", "biller"] },
@@ -13,6 +13,7 @@ const nav = [
   { href: "/billing", label: "Billing", short: "Billing", roles: ["owner", "bcba", "biller"] },
   { href: "/team", label: "Team", short: "Team", roles: ["owner", "bcba"] },
   { href: "/settings", label: "Settings", short: "Settings", roles: ["owner"] },
+  { href: "/profile", label: "My profile", short: "Me", roles: ["owner", "bcba", "bcaba", "rbt", "biller"] },
 ];
 
 export function Shell({ profile, active, children }: { profile: Profile; active: string; children: React.ReactNode }) {
@@ -24,13 +25,13 @@ export function Shell({ profile, active, children }: { profile: Profile; active:
       <nav aria-label="Main" className="hidden md:flex md:w-[232px] md:shrink-0 bg-card border-r border-line p-4 flex-col gap-1 sticky top-0 h-screen">
         <div className="px-2.5 pt-1.5 pb-5"><Logo /></div>
         {items.map((n) => (
-          <Link key={n.href} href={n.href} className={`flex items-center min-h-10 px-2.5 rounded-[10px] text-sm no-underline ${active === n.href ? "bg-teal-soft text-teal-ink font-semibold" : "text-ink font-medium hover:bg-ground"}`}>
+          <Link key={n.href} href={n.href} aria-current={active === n.href ? "page" : undefined} className={`flex items-center min-h-10 px-2.5 rounded-[10px] text-sm no-underline pressable border border-transparent ${active === n.href ? "bg-teal-soft text-teal-ink font-semibold" : "text-ink font-medium hover:bg-ground"}`}>
             {n.label}
           </Link>
         ))}
         <div className="grow" />
         <div className="px-2.5 py-3 border-t border-line text-[13px] text-muted">
-          <div className="text-ink font-semibold">{profile.full_name}</div>
+          <Link href="/profile" className="text-ink font-semibold no-underline hover:underline">{profile.full_name}</Link>
           <div>{profile.credential ?? profile.role}</div>
           <SignOutButton />
         </div>
@@ -39,7 +40,7 @@ export function Shell({ profile, active, children }: { profile: Profile; active:
       {/* Mobile top bar */}
       <div className="md:hidden sticky top-0 z-20 bg-card border-b border-line px-4 py-3 flex justify-between items-center">
         <Logo size={20} />
-        <span className="text-xs text-muted">{profile.full_name.split(" ")[0]} · {profile.credential ?? profile.role}</span>
+        <Link href="/profile" className="text-xs text-muted no-underline">{profile.full_name.split(" ")[0]} · {profile.credential ?? profile.role}</Link>
       </div>
 
       <main className="grow min-w-0 p-4 pb-24 md:p-8 md:pb-8 flex flex-col gap-5">{children}</main>

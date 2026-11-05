@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { clientBook, targetStatus, targetHistory, authUsage } from "@/lib/queries";
 import { sessionSeries, mastered, effective, isStale } from "@/lib/clinical";
 import { Shell } from "@/components/Shell";
+import { Files, type FileRow } from "@/components/Files";
 import { Card, PageTitle, Pill, Btn, fmtDate } from "@/components/ui";
 import { TrendChart } from "@/components/TrendChart";
 import { CPT_LABEL } from "@/lib/types";
@@ -48,6 +49,7 @@ export default async function ClientPage({ params, searchParams }: { params: Pro
   }
   byStaff = Object.fromEntries(Object.entries(byStaff).map(([k, v]) => [k, v]));
   const clientAuths = auths.filter((a) => a.client_id === id);
+  const { data: fileRows } = await supabase.from("files").select("id, name, size, mime, category, created_at, uploaded_by").eq("owner_kind", "client").eq("owner_id", id).order("created_at", { ascending: false });
 
   return (
     <Shell profile={profile} active="/clients">
@@ -121,6 +123,10 @@ export default async function ClientPage({ params, searchParams }: { params: Pro
           )}
         </Card>
       </div>
+      <Card className="p-4.5 flex flex-col gap-3" id="files">
+        <div className="flex justify-between items-center"><div className="font-bold">Files</div><div className="text-xs text-muted">Consents, assessments, treatment plans, insurance cards</div></div>
+        <Files ownerKind="client" ownerId={id} orgId={profile.org_id} files={(fileRows ?? []) as FileRow[]} canDelete={["owner", "bcba"].includes(profile.role)} />
+      </Card>
       <div className="text-xs text-muted">Billing codes in use: {clientAuths.map((a) => `${a.cpt_code} — ${CPT_LABEL[a.cpt_code] ?? ""}`).join(" · ")}</div>
     </Shell>
   );

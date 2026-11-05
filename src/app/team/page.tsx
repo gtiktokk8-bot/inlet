@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { Shell } from "@/components/Shell";
+import Link from "next/link";
 import { Card, PageTitle, Pill, fmtDate } from "@/components/ui";
 import { TeamForms } from "@/components/TeamForms";
 
@@ -22,8 +23,8 @@ export default async function Team() {
             return (
               <div key={s.id} className="px-4.5 py-3.5 border-b border-line-soft last:border-0 flex flex-wrap justify-between items-center gap-3">
                 <div>
-                  <div className="font-semibold">{s.full_name} <span className="text-muted font-normal text-sm">· {s.credential ?? "—"} · {s.role}</span></div>
-                  <div className="text-xs text-muted">NPI {s.npi ?? "—"} · cert {s.cert_expires_on ? `renews ${fmtDate(s.cert_expires_on)}` : "date not set"}</div>
+                  <div className="font-semibold"><Link href={`/team/${s.id}`} className="text-ink no-underline hover:underline">{s.full_name}</Link> <span className="text-muted font-normal text-sm">· {s.credential ?? "—"} · {s.role}</span></div>
+                  <div className="text-xs text-muted">NPI {s.npi ?? "—"} · cert {s.cert_expires_on ? `renews ${fmtDate(s.cert_expires_on)}` : "date not set"} · <Link href={`/team/${s.id}`}>profile &amp; files</Link></div>
                 </div>
                 <div className="flex items-center gap-2">
                   {d !== null && d <= 45 && <Pill tone={d <= 14 ? "red" : "amber"}>{d}d to renewal</Pill>}
